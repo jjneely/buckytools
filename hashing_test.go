@@ -97,7 +97,7 @@ func TestGraphiteCompatible(t *testing.T) {
 	}
 
 	// A known mapping of keys to nodes from Graphite's Python implementation
-	testhash := map[string]string{
+	expected := map[string]string{
 		"1sec.mysql.db109-shard7-g5.4417.Com_help": "graphite015-g5:a",
 		"5min.tomcat.requests.mobile-api-tier.api047-g4_prod_dal05_fitbit_com.page_types.FitbitApiSleepActionBean_getList_GET.logged_in_free.all_bins.responseTime.percentile.90th": "graphite010-g5:c",
 		"1min.statsd.prod.firmware.7_62.annotations.watchdog.115.rate":                                                                                                              "graphite010-g5:b",
@@ -106,7 +106,7 @@ func TestGraphiteCompatible(t *testing.T) {
 		"1min.statsd.prod.intercom.corporate.challenge.participation.count_95":                                                                                                      "graphite015-g5:c",
 	}
 
-	for k, v := range testhash {
+	for k, v := range expected {
 		node := hr.GetNode(k)
 		if node.String() != v {
 			t.Error("Hash not compatible: %s !=> %s, rather %s", k, v, node)
