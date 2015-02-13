@@ -63,7 +63,7 @@ func TestParseRetentionDefs(t *testing.T) {
 
 func TestSortRetentions(t *testing.T) {
 	retentions := Retentions{{300, 12}, {60, 30}, {1, 300}}
-	sort.Sort(retentionsByPrecision{retentions})
+	sort.Sort(RetentionsByPrecision{retentions})
 	if retentions[0].secondsPerPoint != 1 {
 		t.Fatalf("Retentions array is not sorted")
 	}
@@ -226,6 +226,28 @@ func TestOpenFile(t *testing.T) {
 
 	if result1.String() != result2.String() {
 		t.Fatalf("Results do not match")
+	}
+
+	tearDown()
+}
+
+func TestGetRetentions(t *testing.T) {
+	path, _, retentions, tearDown := setUpCreate()
+	wsp, err := Create(path, retentions, Average, 0.5)
+	if err != nil {
+		t.Errorf("Failed to create: %v", err)
+	}
+	archiveList := wsp.Retentions()
+	if len(archiveList) != len(retentions) {
+		t.Fatalf("Returned retentions is not the same length as inital retentions")
+	}
+	for i, _ := range retentions {
+		if retentions[i].secondsPerPoint != archiveList[i].secondsPerPoint {
+			t.Fatalf("Retention's secondsPerPoint do not match")
+		}
+		if retentions[i].numberOfPoints != archiveList[i].numberOfPoints {
+			t.Fatalf("Retention's numberOfPoints do not match")
+		}
 	}
 
 	tearDown()
