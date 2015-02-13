@@ -242,10 +242,10 @@ func TestGetRetentions(t *testing.T) {
 		t.Fatalf("Returned retentions is not the same length as inital retentions")
 	}
 	for i, _ := range retentions {
-		if retentions[i].secondsPerPoint != archiveList[i].secondsPerPoint {
+		if retentions[i].secondsPerPoint != archiveList[i].SecondsPerPoint() {
 			t.Fatalf("Retention's secondsPerPoint do not match")
 		}
-		if retentions[i].numberOfPoints != archiveList[i].numberOfPoints {
+		if retentions[i].numberOfPoints != archiveList[i].NumberOfPoints() {
 			t.Fatalf("Retention's numberOfPoints do not match")
 		}
 	}

@@ -659,6 +659,14 @@ func (retention *Retention) Size() int {
 	return retention.numberOfPoints * PointSize
 }
 
+func (retention *Retention) SecondsPerPoint() int {
+	return retention.secondsPerPoint
+}
+
+func (retention *Retention) NumberOfPoints() int {
+	return retention.numberOfPoints
+}
+
 type Retentions []*Retention
 
 func (r Retentions) Len() int {
