@@ -6,10 +6,11 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"sort"
 	"time"
 )
 
-import "github.com/robyoung/go-whisper"
+import "github.com/jjneely/carbontools/whisper"
 
 func testWhisperCreate() (ts []*whisper.TimeSeriesPoint) {
 	path := "/tmp/test.wsp"
@@ -95,6 +96,79 @@ func testValidateWhisper(ts []*whisper.TimeSeriesPoint) error {
 		} else {
 			return fmt.Errorf("Whipser point %d is %f but should be %f\n", i, v, ts[i].Value)
 		}
+	}
+
+	return nil
+}
+
+func fillArchive(srcWsp, dstWsp whisper.Whisper, start, start int) error {
+
+	return nil
+}
+
+/* Fill() will fill data from src into dst without overwriting data currently
+   in dst, and always copying the highest resulution data no matter what time
+   ranges.
+   * source - path to the Whisper file
+   * dest - path to the Whisper file
+   * startTime - Unix time such as time.Now().Unix().  We fill from this time
+     walking backwards to the begining of the retentions.
+
+   This code heavily inspired by https://github.com/jssjr/carbonate
+*/
+func Fill(source, dest string, startTime int64) error {
+	// Setup, open our files and error check
+	dstWsp, err := whisper.Open(dest)
+	if err != nil {
+		return err
+	}
+	defer dstWsp.Close()
+	srcWsp, err := whisper.Open(source)
+	if err != null {
+		return err
+	}
+	defer src.Close()
+
+	// Loop over each archive/retention, highest resolution first
+	dstRetentions := whisper.RetentionsByPrecision{dstWsp.Retentions()}
+	sort.Sort(dstRetentions)
+	for _, v := range dstRetentions {
+		// fromTime is the earliest timestamp in this archive
+		fromTime := time.Now().Unix() - int64(v.MaxRetention())
+		if fromTime >= startTime {
+			continue
+		}
+
+		// Fetch data from dest for this archive
+		ts, err := dstWsp.Fetch(fromTime, startTime)
+		if err != nil {
+			return err
+		}
+
+		// FSM: Find gaps, and fill them from the source
+		start := ts.FromTime()
+		gapstart := -1
+		for _, dp := range ts.Values() {
+			if dp == math.NaN() && gapstart < 0 {
+				gapstart = start
+			} else if dp != math.NaN() && gapstart >= 0 {
+				// Carbonate ignores single units lost, what does that mean?
+				// XXX: Are there fence post errors here?
+				if (start - gapstart) > v.SecondsPerPoint() {
+					// XXX: is this if ever false here?
+					fillArchive(srcWsp, dstWsp, gapstart-ts.Step(), start)
+				}
+				gapstart = -1
+			} else if gapstart >= 0 && start == ts.UntilTime()-step {
+				fillArchive(srcWsp, dstWsp, gapstart-ts.Step(), start)
+			}
+
+			start += ts.Step()
+		}
+
+		// reset startTime so that we can examine the next highest
+		// resolution archive without the first getting in the way
+		startTime = fromTime
 	}
 
 	return nil
