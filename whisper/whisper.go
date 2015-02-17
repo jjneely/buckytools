@@ -683,6 +683,10 @@ func (r RetentionsByPrecision) Less(i, j int) bool {
 	return r.Retentions[i].secondsPerPoint < r.Retentions[j].secondsPerPoint
 }
 
+func (r RetentionsByPrecision) Iterator() Retentions {
+	return r.Retentions
+}
+
 /*
   Describes a time series in a file.
 
