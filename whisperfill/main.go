@@ -12,8 +12,7 @@ import (
 
 import "github.com/jjneely/carbontools/whisper"
 
-func testWhisperCreate() (ts []*whisper.TimeSeriesPoint) {
-	path := "/tmp/test.wsp"
+func testWhisperCreate(path string) (ts []*whisper.TimeSeriesPoint) {
 	ts = make([]*whisper.TimeSeriesPoint, 30)
 
 	os.Remove(path) // Don't care if it failes
@@ -41,8 +40,7 @@ func testWhisperCreate() (ts []*whisper.TimeSeriesPoint) {
 	return ts
 }
 
-func testWhisperNulls() (ts []*whisper.TimeSeriesPoint) {
-	path := "/tmp/test.wsp"
+func testWhisperNulls(path string) (ts []*whisper.TimeSeriesPoint) {
 	ts = make([]*whisper.TimeSeriesPoint, 30)
 
 	os.Remove(path) // Don't care if it fails
@@ -74,9 +72,7 @@ func testWhisperNulls() (ts []*whisper.TimeSeriesPoint) {
 	return ts
 }
 
-func testValidateWhisper(ts []*whisper.TimeSeriesPoint) error {
-	path := "/tmp/test.wsp"
-
+func testValidateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
 	wsp, err := whisper.Open(path)
 	if err != nil {
 		return err
@@ -90,9 +86,9 @@ func testValidateWhisper(ts []*whisper.TimeSeriesPoint) error {
 	for i, v := range wspData.Values() {
 		// In order time points...should match what's in data
 		if v == ts[i].Value {
-			continue
+			log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
 		} else if math.IsNaN(v) && math.IsNaN(ts[i].Value) {
-			continue
+			log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
 		} else {
 			return fmt.Errorf("Whipser point %d is %f but should be %f\n", i, v, ts[i].Value)
 		}
@@ -101,22 +97,74 @@ func testValidateWhisper(ts []*whisper.TimeSeriesPoint) error {
 	return nil
 }
 
-func fillArchive(srcWsp, dstWsp whisper.Whisper, start, start int) error {
+// fillArchive() is a private function that fills data points from srcWSP
+// into dstWsp.  Used by FIll()
+// * srcWsp and dstWsp are *whisper.Whisper open files
+// * start and stop define an inclusive time window to fill
+// On error an error value is returned.
+//
+// This code heavily inspired by https://github.com/jssjr/carbonate
+func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
+	// Fetch the range defined by start and stop always taking the values
+	// from the highest precision archive, which man require multiple
+	// fetch/merge updates.
+	srcRetentions := whisper.RetentionsByPrecision{srcWsp.Retentions()}
+	sort.Sort(srcRetentions)
+
+	if start < srcWsp.StartTime() && stop < srcWsp.StartTime() {
+		// Nothing to fill/merge
+		return nil
+	}
+
+	// Begin our backwards walk in time
+	for _, v := range srcRetentions.Iterator() {
+		points := make([]*whisper.TimeSeriesPoint, 0)
+		rTime := int(time.Now().Unix()) - v.MaxRetention()
+		if stop <= rTime {
+			// This archive contains no data points in the window
+			continue
+		}
+
+		// Start and the start time or the beginning of this archive
+		fromTime := start
+		if rTime > start {
+			fromTime = rTime
+		}
+
+		ts, err := srcWsp.Fetch(fromTime, stop)
+		if err != nil {
+			return err
+		}
+		// Build a list of points to merge
+		tsStart := ts.FromTime()
+		for _, dp := range ts.Values() {
+			if dp != math.NaN() {
+				points = append(points, &whisper.TimeSeriesPoint{tsStart, dp})
+			}
+			tsStart += ts.Step()
+		}
+		dstWsp.UpdateMany(points)
+
+		stop = fromTime
+		if start >= stop {
+			// Nothing more to fetch
+			break
+		}
+	}
 
 	return nil
 }
 
-/* Fill() will fill data from src into dst without overwriting data currently
-   in dst, and always copying the highest resulution data no matter what time
-   ranges.
-   * source - path to the Whisper file
-   * dest - path to the Whisper file
-   * startTime - Unix time such as time.Now().Unix().  We fill from this time
-     walking backwards to the begining of the retentions.
-
-   This code heavily inspired by https://github.com/jssjr/carbonate
-*/
-func Fill(source, dest string, startTime int64) error {
+// Fill() will fill data from src into dst without overwriting data currently
+// in dst, and always copying the highest resulution data no matter what time
+// ranges.
+// * source - path to the Whisper file
+// * dest - path to the Whisper file
+// * startTime - Unix time such as time.Now().Unix().  We fill from this time
+//   walking backwards to the begining of the retentions.
+//
+// This code heavily inspired by https://github.com/jssjr/carbonate
+func Fill(source, dest string, startTime int) error {
 	// Setup, open our files and error check
 	dstWsp, err := whisper.Open(dest)
 	if err != nil {
@@ -124,17 +172,17 @@ func Fill(source, dest string, startTime int64) error {
 	}
 	defer dstWsp.Close()
 	srcWsp, err := whisper.Open(source)
-	if err != null {
+	if err != nil {
 		return err
 	}
-	defer src.Close()
+	defer srcWsp.Close()
 
 	// Loop over each archive/retention, highest resolution first
 	dstRetentions := whisper.RetentionsByPrecision{dstWsp.Retentions()}
 	sort.Sort(dstRetentions)
-	for _, v := range dstRetentions {
+	for _, v := range dstRetentions.Iterator() {
 		// fromTime is the earliest timestamp in this archive
-		fromTime := time.Now().Unix() - int64(v.MaxRetention())
+		fromTime := int(time.Now().Unix()) - v.MaxRetention()
 		if fromTime >= startTime {
 			continue
 		}
@@ -159,7 +207,7 @@ func Fill(source, dest string, startTime int64) error {
 					fillArchive(srcWsp, dstWsp, gapstart-ts.Step(), start)
 				}
 				gapstart = -1
-			} else if gapstart >= 0 && start == ts.UntilTime()-step {
+			} else if gapstart >= 0 && start == ts.UntilTime()-ts.Step() {
 				fillArchive(srcWsp, dstWsp, gapstart-ts.Step(), start)
 			}
 
@@ -176,15 +224,37 @@ func Fill(source, dest string, startTime int64) error {
 
 func main() {
 	log.Println("Initial Go Whisper testing...")
-	data := testWhisperCreate()
-	err := testValidateWhisper(data)
+	dataA := testWhisperCreate("a.wsp")
+	err := testValidateWhisper("a.wsp", dataA)
 	if err != nil {
 		panic(err)
 	}
 	log.Println("Testing for Null support...")
-	data = testWhisperNulls()
-	err = testValidateWhisper(data)
+	dataB := testWhisperNulls("b.wsp")
+	err = testValidateWhisper("b.wsp", dataB)
 	if err != nil {
 		panic(err)
 	}
+	log.Println("Testing backfil...")
+
+	dataMerged := make([]*whisper.TimeSeriesPoint, 30)
+	for i, _ := range dataMerged {
+		if dataB[i].Value == math.NaN() && dataA[i].Value != math.NaN() {
+			dataMerged[i] = dataA[i]
+		} else if dataB[i].Value != math.NaN() {
+			dataMerged[i] = dataB[i]
+		} else {
+			dataMerged[i].Value = math.NaN()
+			dataMerged[i].Time = dataA[i].Time
+		}
+	}
+	err = Fill("a.wsp", "b.wsp", int(time.Now().Unix()))
+	if err != nil {
+		panic(err)
+	}
+	err = testValidateWhisper("b.wsp", dataMerged)
+	if err != nil {
+		panic(err)
+	}
+	log.Println("Tests complete.")
 }
