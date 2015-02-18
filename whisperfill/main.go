@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"os/exec"
 	"sort"
 	"time"
 )
@@ -26,6 +27,7 @@ func testWhisperCreate(path string) (ts []*whisper.TimeSeriesPoint) {
 	}
 	defer wsp.Close()
 
+	rand.Seed(time.Now().Unix())
 	for i, _ := range ts {
 		dur := fmt.Sprintf("-%dm", 29-i)
 		tdur, _ := time.ParseDuration(dur)
@@ -58,7 +60,7 @@ func testWhisperNulls(path string) (ts []*whisper.TimeSeriesPoint) {
 		tdur, _ := time.ParseDuration(fmt.Sprintf("-%dm", 29-i))
 		j := rand.Intn(100)
 		point := new(whisper.TimeSeriesPoint)
-		if j < 75 {
+		if j < 65 {
 			point.Value = math.NaN()
 		} else {
 			point.Value = float64(j)
@@ -83,6 +85,7 @@ func testValidateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
 	if err != nil {
 		return err
 	}
+	var flag error = nil
 	for i, v := range wspData.Values() {
 		// In order time points...should match what's in data
 		if v == ts[i].Value {
@@ -90,11 +93,14 @@ func testValidateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
 		} else if math.IsNaN(v) && math.IsNaN(ts[i].Value) {
 			log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
 		} else {
-			return fmt.Errorf("Whipser point %d is %f but should be %f\n", i, v, ts[i].Value)
+			log.Printf("Verifty %.2f != %.2f\n", v, ts[i].Value)
+			if flag == nil {
+				flag = fmt.Errorf("Whipser point %d is %f but should be %f\n", i, v, ts[i].Value)
+			}
 		}
 	}
 
-	return nil
+	return flag
 }
 
 // fillArchive() is a private function that fills data points from srcWSP
@@ -138,7 +144,7 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 		// Build a list of points to merge
 		tsStart := ts.FromTime()
 		for _, dp := range ts.Values() {
-			if dp != math.NaN() {
+			if !math.IsNaN(dp) {
 				points = append(points, &whisper.TimeSeriesPoint{tsStart, dp})
 			}
 			tsStart += ts.Step()
@@ -197,9 +203,9 @@ func Fill(source, dest string, startTime int) error {
 		start := ts.FromTime()
 		gapstart := -1
 		for _, dp := range ts.Values() {
-			if dp == math.NaN() && gapstart < 0 {
+			if math.IsNaN(dp) && gapstart < 0 {
 				gapstart = start
-			} else if dp != math.NaN() && gapstart >= 0 {
+			} else if !math.IsNaN(dp) && gapstart >= 0 {
 				// Carbonate ignores single units lost, what does that mean?
 				// XXX: Are there fence post errors here?
 				if (start - gapstart) > v.SecondsPerPoint() {
@@ -235,24 +241,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	log.Println("Testing backfil...")
+	c := exec.Command("cp", "-f", "a.wsp", "a.safe.wsp")
+	c.Run()
+	c = exec.Command("cp", "-f", "b.wsp", "b.safe.wsp")
+	c.Run()
+
+	log.Println("Testing backfill...")
 
 	dataMerged := make([]*whisper.TimeSeriesPoint, 30)
 	for i, _ := range dataMerged {
-		if dataB[i].Value == math.NaN() && dataA[i].Value != math.NaN() {
+		if math.IsNaN(dataB[i].Value) && !math.IsNaN(dataA[i].Value) {
 			dataMerged[i] = dataA[i]
-		} else if dataB[i].Value != math.NaN() {
+		} else if !math.IsNaN(dataB[i].Value) {
 			dataMerged[i] = dataB[i]
 		} else {
 			dataMerged[i].Value = math.NaN()
 			dataMerged[i].Time = dataA[i].Time
 		}
+		log.Println(dataMerged[i].Value)
 	}
 	err = Fill("a.wsp", "b.wsp", int(time.Now().Unix()))
 	if err != nil {
 		panic(err)
 	}
 	err = testValidateWhisper("b.wsp", dataMerged)
+
 	if err != nil {
 		panic(err)
 	}
