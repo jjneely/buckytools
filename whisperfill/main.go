@@ -35,9 +35,9 @@ func testWhisperCreate(path string) (ts []*whisper.TimeSeriesPoint) {
 		point.Value = float64(rand.Intn(100))
 		point.Time = int(time.Now().Add(tdur).Unix())
 		ts[i] = point
-		wsp.Update(point.Value, point.Time)
 		log.Printf("WhisperCreate(): point -%dm is %.2f\n", 29-i, point.Value)
 	}
+	wsp.UpdateMany(ts)
 
 	return ts
 }
@@ -62,15 +62,18 @@ func testWhisperNulls(path string) (ts []*whisper.TimeSeriesPoint) {
 		point := new(whisper.TimeSeriesPoint)
 		if j < 65 {
 			point.Value = math.NaN()
+			point.Time = 0
 		} else {
 			point.Value = float64(j)
+			point.Time = int(time.Now().Add(tdur).Unix())
 		}
-		point.Time = int(time.Now().Add(tdur).Unix())
 		ts[i] = point
 		log.Printf("WhisperNulls(): point -%dm is %.2f\n", 29-i, point.Value)
+		if !math.IsNaN(point.Value) {
+			wsp.Update(point.Value, point.Time)
+		}
 	}
 
-	wsp.UpdateMany(ts)
 	return ts
 }
 
@@ -101,6 +104,23 @@ func testValidateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
 	}
 
 	return flag
+}
+
+func dump_old(path string) {
+	wsp, err := whisper.Open(path)
+	if err != nil {
+		panic(err)
+	}
+	defer wsp.Close()
+
+	wspData, err := wsp.Fetch(0, int(time.Now().Unix()))
+	if err != nil {
+		panic(err)
+	}
+
+	for i, v := range wspData.Values() {
+		log.Printf("DP[%d] == %.2f\n", i, v)
+	}
 }
 
 // fillArchive() is a private function that fills data points from srcWSP
@@ -227,6 +247,12 @@ func Fill(source, dest string, startTime int) error {
 
 	return nil
 }
+
+/*
+func main() {
+	dump("test-empty.wsp")
+}
+*/
 
 func main() {
 	log.Println("Initial Go Whisper testing...")
