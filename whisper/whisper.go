@@ -742,10 +742,10 @@ func (ts *TimeSeries) Values() []float64 {
 	return ts.values
 }
 
-func (ts *TimeSeries) Points() []TimeSeriesPoint {
-	points := make([]TimeSeriesPoint, len(ts.values))
+func (ts *TimeSeries) Points() []*TimeSeriesPoint {
+	points := make([]*TimeSeriesPoint, len(ts.values))
 	for i, value := range ts.values {
-		points[i] = TimeSeriesPoint{Time: ts.fromTime + ts.step*i, Value: value}
+		points[i] = &TimeSeriesPoint{Time: ts.fromTime + ts.step*i, Value: value}
 	}
 	return points
 }
