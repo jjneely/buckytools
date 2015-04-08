@@ -13,17 +13,43 @@ import (
 
 import "github.com/jjneely/carbontools/whisper"
 
-func whisperCreate(path string) (ts []*whisper.TimeSeriesPoint) {
-	ts = make([]*whisper.TimeSeriesPoint, 30)
+func whisperCreateData(path string, ts []*whisper.TimeSeriesPoint) error {
+	os.Remove(path) // Don't care if it fails
+	retentions, err := whisper.ParseRetentionDefs("1m:30m")
+	if err != nil {
+		return err
+	}
+	wsp, err := whisper.Create(path, retentions, whisper.Sum, 0.5)
+	if err != nil {
+		return err
+	}
+	defer wsp.Close()
+
+	// Iterate through the slice so we can support null values
+	for _, point := range ts {
+		if math.IsNaN(point.Value) {
+			continue
+		}
+		err = wsp.Update(point.Value, point.Time)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func whisperCreate(path string) ([]*whisper.TimeSeriesPoint, error) {
+	ts := make([]*whisper.TimeSeriesPoint, 30)
 
 	os.Remove(path) // Don't care if it fails
 	retentions, err := whisper.ParseRetentionDefs("1m:30m")
 	if err != nil {
-		panic(err)
+		return ts, err
 	}
 	wsp, err := whisper.Create(path, retentions, whisper.Sum, 0.5)
 	if err != nil {
-		panic(err)
+		return ts, err
 	}
 	defer wsp.Close()
 
@@ -39,20 +65,20 @@ func whisperCreate(path string) (ts []*whisper.TimeSeriesPoint) {
 	}
 	wsp.UpdateMany(ts)
 
-	return ts
+	return ts, nil
 }
 
-func whisperCreateNulls(path string) (ts []*whisper.TimeSeriesPoint) {
-	ts = make([]*whisper.TimeSeriesPoint, 30)
+func whisperCreateNulls(path string) ([]*whisper.TimeSeriesPoint, error) {
+	ts := make([]*whisper.TimeSeriesPoint, 30)
 
 	os.Remove(path) // Don't care if it fails
 	retentions, err := whisper.ParseRetentionDefs("1m:30m")
 	if err != nil {
-		panic(err)
+		return ts, err
 	}
 	wsp, err := whisper.Create(path, retentions, whisper.Sum, 0.5)
 	if err != nil {
-		panic(err)
+		return ts, err
 	}
 	defer wsp.Close()
 
@@ -70,11 +96,14 @@ func whisperCreateNulls(path string) (ts []*whisper.TimeSeriesPoint) {
 		ts[i] = point
 		log.Printf("WhisperNulls(): point -%dm is %.2f\n", 29-i, point.Value)
 		if !math.IsNaN(point.Value) {
-			wsp.Update(point.Value, point.Time)
+			err = wsp.Update(point.Value, point.Time)
+			if err != nil {
+				return ts, err
+			}
 		}
 	}
 
-	return ts
+	return ts, nil
 }
 
 func validateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
@@ -104,6 +133,31 @@ func validateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
 	}
 
 	return flag
+}
+
+func fetchFromFile(path string) ([]*whisper.TimeSeriesPoint, error) {
+	// Init the datastructure we will load values into
+	tsp := make([]*whisper.TimeSeriesPoint, 30)
+	for i, _ := range tsp {
+		point := new(whisper.TimeSeriesPoint)
+		point.Value = math.NaN()
+		tsp[i] = point
+	}
+
+	// Try to open the file
+	wsp, err := whisper.Open(path)
+	if err != nil {
+		return tsp, err
+	}
+	defer wsp.Close()
+
+	// Parse and fetch data from it
+	ts, err := wsp.Fetch(0, int(time.Now().Unix()))
+	if err != nil {
+		return tsp, err
+	}
+
+	return ts.Points(), nil
 }
 
 func dump(path string) {
@@ -155,17 +209,23 @@ func simulateFill(a, b []*whisper.TimeSeriesPoint) []*whisper.TimeSeriesPoint {
 // func Fill(source, dest string, startTime int) error
 
 func TestFill(t *testing.T) {
-	dataA := whisperCreate("a.wsp")
+	dataA, err := whisperCreate("a.wsp")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if validateWhisper("a.wsp", dataA) != nil {
 		t.Error("Data written to a.wsp doesn't match what was read")
 	}
 
-	dataB := whisperCreateNulls("b.wsp")
+	dataB, err := whisperCreateNulls("b.wsp")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if validateWhisper("b.wsp", dataB) != nil {
 		t.Error("Data with nulls written to b.wsp doesn't match what was read")
 	}
 
-	err := Fill("a.wsp", "b.wsp", int(time.Now().Unix()))
+	err = Fill("a.wsp", "b.wsp", int(time.Now().Unix()))
 	if err != nil {
 		t.Error(err)
 	}
@@ -179,16 +239,71 @@ func TestFill(t *testing.T) {
 }
 
 func TestReference(t *testing.T) {
-	dataA := whisperCreate("a.wsp")
-	dataB := whisperCreateNulls("b.wsp")
+	// Create our random test data
+	dataA, err := whisperCreate("a1.wsp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataB, err := whisperCreateNulls("b1.wsp")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an identical set of test data
+	err = whisperCreateData("a2.wsp", dataA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = whisperCreateData("b2.wsp", dataB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check our copies
+	err = validateWhisper("a2.wsp", dataA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = validateWhisper("b2.wsp", dataB)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// whisper-fill.py needs to be in the PATH somewhere
 	log.Println("Running whisper-fill.py...")
-	c := exec.Command("whisper-fill.py", "a.wsp", "b.wsp")
-	c.Run()
-
-	err := validateWhisper("b.wsp", simulateFill(dataA, dataB))
+	c := exec.Command("whisper-fill.py", "a1.wsp", "b1.wsp")
+	err = c.Run()
 	if err != nil {
 		t.Error(err)
+	}
+	pythonFill, err := fetchFromFile("b1.wsp")
+	if err != nil {
+		t.Error(err)
+	}
+	// Here, pythonFill is either NaNs (failed to read WSP file) or
+	// the data from the python reference fill operation
+
+	// Run my version
+	err = Fill("a2.wsp", "b2.wsp", int(time.Now().Unix()))
+	if err != nil {
+		t.Error(err)
+	}
+	goFill, err := fetchFromFile("b2.wsp")
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Compare to what we think our version should be
+	simuFill := simulateFill(dataA, dataB)
+	err = validateWhisper("b2.wsp", simuFill)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Now try to print out a table of A, B, Python, Go, Simu
+	fmt.Printf("A     \tB     \tPython\tGo    \tSimu\n")
+	fmt.Printf("======\t======\t======\t======\t======\n")
+	for i := 0; i < 30; i++ {
+		fmt.Printf("%6.1f\t%6.1f\t%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, pythonFill[i].Value, goFill[i].Value, simuFill[i].Value)
 	}
 }
