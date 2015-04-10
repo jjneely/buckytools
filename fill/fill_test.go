@@ -160,25 +160,6 @@ func fetchFromFile(path string) ([]*whisper.TimeSeriesPoint, error) {
 	return ts.Points(), nil
 }
 
-func dump(path string) {
-	wsp, err := whisper.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer wsp.Close()
-
-	wspData, err := wsp.Fetch(0, int(time.Now().Unix()))
-	if err != nil {
-		panic(err)
-	}
-
-	interval := wspData.FromTime()
-	for i, v := range wspData.Values() {
-		log.Printf("DP[%d] == %d\t%.2f\n", i, interval, v)
-		interval += wspData.Step()
-	}
-}
-
 func simulateFill(a, b []*whisper.TimeSeriesPoint) []*whisper.TimeSeriesPoint {
 	// Assume that we are simulating the fill operation on WSP DBs created
 	// with the above functions.
@@ -237,13 +218,20 @@ func TestFill(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	log.Println("Final results:")
-	dump("b.wsp")
 
-	err = validateWhisper("b.wsp", simulateFill(dataA, dataB))
+	simuFill := simulateFill(dataA, dataB)
+	err = validateWhisper("b.wsp", simuFill)
 	if err != nil {
 		t.Error(err)
 	}
+
+	// Table of actual results
+	fmt.Printf("A     \tB     \tSimu\n")
+	fmt.Printf("======\t======\t======\n")
+	for i := 0; i < 30; i++ {
+		fmt.Printf("%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, simuFill[i].Value)
+	}
+	fmt.Println()
 }
 
 func TestReference(t *testing.T) {
@@ -318,4 +306,5 @@ func TestReference(t *testing.T) {
 			fmt.Printf("%6.1f\t%6.1f\t%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, pythonFill[i].Value, goFill[i].Value, simuFill[i].Value)
 		}
 	}
+	fmt.Println()
 }
