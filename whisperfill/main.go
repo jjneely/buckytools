@@ -226,14 +226,23 @@ func Fill(source, dest string, startTime int) error {
 			if math.IsNaN(dp) && gapstart < 0 {
 				gapstart = start
 			} else if !math.IsNaN(dp) && gapstart >= 0 {
-				// Carbonate ignores single units lost, what does that mean?
-				// XXX: Are there fence post errors here?
+				// Carbonate ignores single units lost.  Means:
+				// XXX: Gap of a single step are ignored as the
+				// following if uses > not, =>
 				if (start - gapstart) > v.SecondsPerPoint() {
-					// XXX: is this if ever false here?
+					// XXX: Fence post: This replaces the
+					// current DP -- a known good value
 					fillArchive(srcWsp, dstWsp, gapstart-ts.Step(), start)
+					// We always fill starting at gap-step
+					// because the Fetch() command will pull
+					// the next valid interval's point even
+					// if we give it a valid interval.
 				}
 				gapstart = -1
 			} else if gapstart >= 0 && start == ts.UntilTime()-ts.Step() {
+				// The timeSeries doesn't actually include a
+				// value for ts.UntilTime(), like len() we need
+				// to subtract a step to index the last value
 				fillArchive(srcWsp, dstWsp, gapstart-ts.Step(), start)
 			}
 

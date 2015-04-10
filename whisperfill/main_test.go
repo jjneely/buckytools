@@ -61,7 +61,7 @@ func whisperCreate(path string) ([]*whisper.TimeSeriesPoint, error) {
 		point.Value = float64(rand.Intn(100))
 		point.Time = int(time.Now().Add(tdur).Unix())
 		ts[i] = point
-		log.Printf("WhisperCreate(): point -%dm is %.2f\n", 29-i, point.Value)
+		//log.Printf("WhisperCreate(): point -%dm is %.2f\n", 29-i, point.Value)
 	}
 	wsp.UpdateMany(ts)
 
@@ -94,7 +94,7 @@ func whisperCreateNulls(path string) ([]*whisper.TimeSeriesPoint, error) {
 			point.Time = int(time.Now().Add(tdur).Unix())
 		}
 		ts[i] = point
-		log.Printf("WhisperNulls(): point -%dm is %.2f\n", 29-i, point.Value)
+		//log.Printf("WhisperNulls(): point -%dm is %.2f\n", 29-i, point.Value)
 		if !math.IsNaN(point.Value) {
 			err = wsp.Update(point.Value, point.Time)
 			if err != nil {
@@ -121,11 +121,11 @@ func validateWhisper(path string, ts []*whisper.TimeSeriesPoint) error {
 	for i, v := range wspData.Values() {
 		// In order time points...should match what's in data
 		if v == ts[i].Value {
-			log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
+			//log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
 		} else if math.IsNaN(v) && math.IsNaN(ts[i].Value) {
-			log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
+			//log.Printf("Verifty %.2f == %.2f\n", v, ts[i].Value)
 		} else {
-			log.Printf("Verifty %.2f != %.2f\n", v, ts[i].Value)
+			//log.Printf("Verifty %.2f != %.2f\n", v, ts[i].Value)
 			if flag == nil {
 				flag = fmt.Errorf("Whipser point %d is %f but should be %f\n", i, v, ts[i].Value)
 			}
@@ -182,15 +182,23 @@ func dump(path string) {
 func simulateFill(a, b []*whisper.TimeSeriesPoint) []*whisper.TimeSeriesPoint {
 	// Assume that we are simulating the fill operation on WSP DBs created
 	// with the above functions.
+	// This is a shallow copy operation.
 	dataMerged := make([]*whisper.TimeSeriesPoint, 30)
-	for i, _ := range dataMerged {
-		if math.IsNaN(b[i].Value) && !math.IsNaN(a[i].Value) {
-			dataMerged[i] = a[i]
-		} else if !math.IsNaN(b[i].Value) {
-			dataMerged[i] = b[i]
-		} else {
-			dataMerged[i].Value = math.NaN()
-			dataMerged[i].Time = 0
+	// copy everything in b over to our return value
+	copy(dataMerged, b)
+	gapstart := -1
+	for i, v := range dataMerged {
+		if math.IsNaN(v.Value) && gapstart < 0 {
+			gapstart = i
+		} else if !math.IsNaN(v.Value) && gapstart >= 0 {
+			if i-gapstart > 1 {
+				// like the source, ignore single null values.
+				// like the source copy over the current value.
+				copy(dataMerged[gapstart:i+1], a[gapstart:i+1])
+			}
+			gapstart = -1
+		} else if gapstart >= 0 && i == len(dataMerged)-1 {
+			copy(dataMerged[gapstart:i+1], a[gapstart:i+1])
 		}
 	}
 
