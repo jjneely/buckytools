@@ -1,4 +1,4 @@
-package main
+package fill
 
 import (
 	"math"
@@ -66,16 +66,14 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 	return nil
 }
 
-// Fill() will fill data from src into dst without overwriting data currently
+// Files() will fill data from src into dst without overwriting data currently
 // in dst, and always copying the highest resulution data no matter what time
 // ranges.
 // * source - path to the Whisper file
 // * dest - path to the Whisper file
 // * startTime - Unix time such as time.Now().Unix().  We fill from this time
 //   walking backwards to the begining of the retentions.
-//
-// This code heavily inspired by https://github.com/jssjr/carbonate
-func Fill(source, dest string, startTime int) error {
+func Files(source, dest string, startTime int) error {
 	// Setup, open our files and error check
 	dstWsp, err := whisper.Open(dest)
 	if err != nil {
@@ -88,6 +86,27 @@ func Fill(source, dest string, startTime int) error {
 	}
 	defer srcWsp.Close()
 
+	return OpenWSP(srcWsp, dstWsp, startTime)
+}
+
+// All() is a convenience function when you need to fill all of
+// the given whisper file paths rather than a specific time range.
+// * source - path to source Whisper file
+// * dest   - path to destination Whisper file
+func All(source, dest string) error {
+	return Files(source, dest, int(time.Now().Unix()))
+}
+
+// OpenWSP() runs the fill operation on two whisper.Whisper objects that are
+// already open.
+// * srcWsp - source *whisper.Whisper object
+// * dstWsp - destination *whisper,Whisper object
+// * startTime - Unix time such as int(time.Now().Unix()).  We fill from
+//   this time walking backwards to the beginning.
+//
+// This code heavily inspired by https://github.com/jssjr/carbonate
+// and matches its behavior exactly.
+func OpenWSP(srcWsp, dstWsp *whisper.Whisper, startTime int) error {
 	// Loop over each archive/retention, highest resolution first
 	dstRetentions := whisper.RetentionsByPrecision{dstWsp.Retentions()}
 	sort.Sort(dstRetentions)

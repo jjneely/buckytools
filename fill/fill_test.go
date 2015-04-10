@@ -1,4 +1,4 @@
-package main
+package fill
 
 import (
 	"fmt"
@@ -205,7 +205,7 @@ func simulateFill(a, b []*whisper.TimeSeriesPoint) []*whisper.TimeSeriesPoint {
 	return dataMerged
 }
 
-// Fill() will fill data from src into dst without overwriting data currently
+// Files() will fill data from src into dst without overwriting data currently
 // in dst, and always copying the highest resulution data no matter what time
 // ranges.
 // * source - path to the Whisper file
@@ -233,7 +233,7 @@ func TestFill(t *testing.T) {
 		t.Error("Data with nulls written to b.wsp doesn't match what was read")
 	}
 
-	err = Fill("a.wsp", "b.wsp", int(time.Now().Unix()))
+	err = Files("a.wsp", "b.wsp", int(time.Now().Unix()))
 	if err != nil {
 		t.Error(err)
 	}
@@ -284,7 +284,7 @@ func TestReference(t *testing.T) {
 	pythonFill, err := fetchFromFile("b1.wsp")
 
 	// Run my version
-	err = Fill("a2.wsp", "b2.wsp", int(time.Now().Unix()))
+	err = Files("a2.wsp", "b2.wsp", int(time.Now().Unix()))
 	if err != nil {
 		t.Error(err)
 	}
