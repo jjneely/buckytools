@@ -280,16 +280,8 @@ func TestReference(t *testing.T) {
 	// whisper-fill.py needs to be in the PATH somewhere
 	log.Println("Running whisper-fill.py...")
 	c := exec.Command("whisper-fill.py", "a1.wsp", "b1.wsp")
-	err = c.Run()
-	if err != nil {
-		t.Error(err)
-	}
+	reference_err := c.Run()
 	pythonFill, err := fetchFromFile("b1.wsp")
-	if err != nil {
-		t.Error(err)
-	}
-	// Here, pythonFill is either NaNs (failed to read WSP file) or
-	// the data from the python reference fill operation
 
 	// Run my version
 	err = Fill("a2.wsp", "b2.wsp", int(time.Now().Unix()))
@@ -308,10 +300,22 @@ func TestReference(t *testing.T) {
 		t.Error(err)
 	}
 
+	// Validate the reference if whisper-fill.py was found
+	if reference_err == nil {
+		err = validateWhisper("b1.wsp", simuFill)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
 	// Now try to print out a table of A, B, Python, Go, Simu
 	fmt.Printf("A     \tB     \tPython\tGo    \tSimu\n")
 	fmt.Printf("======\t======\t======\t======\t======\n")
 	for i := 0; i < 30; i++ {
-		fmt.Printf("%6.1f\t%6.1f\t%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, pythonFill[i].Value, goFill[i].Value, simuFill[i].Value)
+		if reference_err != nil {
+			fmt.Printf("%6.1f\t%6.1f\t%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, math.NaN(), goFill[i].Value, simuFill[i].Value)
+		} else {
+			fmt.Printf("%6.1f\t%6.1f\t%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, pythonFill[i].Value, goFill[i].Value, simuFill[i].Value)
+		}
 	}
 }
