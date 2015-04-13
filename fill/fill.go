@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-import "github.com/jjneely/carbontools/whisper"
+import "github.com/jjneely/buckytools/whisper"
 
 // fillArchive() is a private function that fills data points from srcWSP
 // into dstWsp.  Used by FIll()

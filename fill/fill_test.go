@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-import "github.com/jjneely/carbontools/whisper"
+import "github.com/jjneely/buckytools/whisper"
 
 func whisperCreateData(path string, ts []*whisper.TimeSeriesPoint) error {
 	os.Remove(path) // Don't care if it fails
@@ -225,11 +225,17 @@ func TestFill(t *testing.T) {
 		t.Error(err)
 	}
 
+	result, err := fetchFromFile("b.wsp")
+	if err != nil {
+		// Couldn't read from file?
+		t.Fatal(err)
+	}
+
 	// Table of actual results
-	fmt.Printf("A     \tB     \tSimu\n")
-	fmt.Printf("======\t======\t======\n")
+	fmt.Printf("A     \tB     \tSimu\tResult\n")
+	fmt.Printf("======\t======\t======\t======\n")
 	for i := 0; i < 30; i++ {
-		fmt.Printf("%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, simuFill[i].Value)
+		fmt.Printf("%6.1f\t%6.1f\t%6.1f\t%6.1f\n", dataA[i].Value, dataB[i].Value, simuFill[i].Value, result[i].Value)
 	}
 	fmt.Println()
 }
