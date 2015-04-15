@@ -1,9 +1,14 @@
-Go Carbontools
+Go Buckytools
 ==============
 
-When working large consistent hashing clusters doing simple maintenance can
-involve a lot of data moving around.  Normally, one would reach for the
-Carbonate tools:
+Buckyballs and buckytubes are fullerene of carbon or carbon molecules such
+as a Buckminsterfullerene.  They are similar to graphite but the carbon
+structures are regular.  Hopefully, this code will allow multiple Graphite
+servers to work and scale better together.
+
+When working large consistent hashing Graphite clusters doing simple
+maintenance can involve a lot of data moving around.  Normally, one would reach
+for the Carbonate tools:
 
     https://github.com/jssjr/carbonate
 
