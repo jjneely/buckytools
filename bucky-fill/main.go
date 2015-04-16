@@ -6,23 +6,26 @@ import (
 	"os"
 )
 
+import "github.com/jjneely/buckytools"
 import "github.com/jjneely/buckytools/fill"
-
-// XXX: A generic version for the entire suite, should be in a
-// more appropriate place
-const version = "0.0.1"
 
 func usage() {
 	fmt.Printf("%s <src> <dst>\n", os.Args[0])
-	fmt.Printf("Version: %s\n", version)
+	fmt.Printf("Version: %s\n", buckytools.Version)
 	fmt.Printf("\tCopies data points from the whisper database <src> to <dst>\n")
-	fmt.Printf("\twithout overwriting existing data in <dst>.\n")
+	fmt.Printf("\twithout overwriting existing data in <dst>.\n\n")
 	flag.PrintDefaults()
 }
 
 func main() {
 	flag.Usage = usage
+	version := flag.Bool("version", false, "Display version information.")
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("Buckytools version: %s\n", buckytools.Version)
+		os.Exit(0)
+	}
 	if flag.NArg() != 2 {
 		usage()
 		os.Exit(1)
