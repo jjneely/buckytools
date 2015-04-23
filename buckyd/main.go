@@ -5,9 +5,11 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 )
 
 var metricsCache *MetricsCacheType
+var tmpDir string
 
 func logRequest(r *http.Request) {
 	log.Printf("%s - - %s %s", r.RemoteAddr, r.Method, r.RequestURI)
@@ -26,6 +28,10 @@ func unmarshalList(encoded string) ([]string, error) {
 func main() {
 	var bindAddress string
 
+	flag.StringVar(&tmpDir, "tmpdir", os.TempDir(),
+		"Temporary file location.")
+	flag.StringVar(&tmpDir, "t", os.TempDir(),
+		"Temporary file location.")
 	flag.StringVar(&bindAddress, "bind", "0.0.0.0:4242",
 		"IP:PORT to listen for HTTP requests.")
 	flag.StringVar(&bindAddress, "b", "0.0.0.0:4242",

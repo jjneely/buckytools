@@ -31,9 +31,11 @@ or name and not a file path.
 
 Methods:
 
-* GET - Fetch the raw Whisper DB file.
-* PUT - Replace the raw Whisper DB with supplied content
+* HEAD - Stat the metric and return the results in a JSON encoded
+  header field named X-Metric-Stat.
+* GET - Fetch the raw Whisper DB file.  os.Stat() info in X-Metric-Stat.
+* PUT - Replace the raw Whisper DB with supplied content.
 * POST - Update the Whisper DB by backfilling the on disk version.  Does not
   overwrite existing points, but will fill in data if the matching on disk
   data point is null.  See Carbonate's whisper-fill.py.
-* DELETE - Remove this metric from the file system
+* DELETE - Remove this metric from the file system.
