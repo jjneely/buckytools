@@ -39,3 +39,18 @@ Methods:
   overwrite existing points, but will fill in data if the matching on disk
   data point is null.  See Carbonate's whisper-fill.py.
 * DELETE - Remove this metric from the file system.
+
+/hashring
+---------
+
+Return hashring information to the client.  The server doesn't actually do
+anything with this data but store it and hand it to the client when asked.
+This becomes a way for the client to discover the other members in the
+consistent hashsing graphite cluster and to detect if all nodes are
+setup the same way.
+
+Methods:
+
+* GET - Return a JSON encoded hash with two items: Name (the name of the
+  current node) and Nodes (a list of all the server/instance pairs in the
+  ring.
