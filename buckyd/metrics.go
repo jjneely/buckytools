@@ -11,15 +11,8 @@ import (
 	"strconv"
 )
 
+import . "github.com/jjneely/buckytools"
 import "github.com/jjneely/buckytools/fill"
-
-// MetricStatType A JSON marshalable FileInfo type
-type MetricStatType struct {
-	Name    string // Filename
-	Size    int64  // file size
-	Mode    uint32 // mode bits
-	ModTime int64  // Unix time
-}
 
 // listMetrics retrieves a list of metrics on the localhost and sends
 // it to the client.
