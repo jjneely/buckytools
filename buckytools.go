@@ -1,5 +1,9 @@
 package buckytools
 
+import (
+	"encoding/json"
+)
+
 const (
 	// Buckytools suite version
 	Version = "0.0.1"
@@ -19,4 +23,12 @@ type MetricStatType struct {
 type JSONRingType struct {
 	Name  string
 	Nodes []string
+}
+
+func (j *JSONRingType) String() string {
+	blob, err := json.Marshal(j)
+	if err != nil {
+		return err.Error()
+	}
+	return string(blob)
 }

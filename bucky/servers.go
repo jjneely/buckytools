@@ -30,8 +30,8 @@ is alive.`
 // getSingleHashRing connects to the given host and returns a slice of
 // strings containing the host's configured hashring.  An error value is
 // set if we could not retrieve the hashring information.
-func GetSingleHashRing(host string) (*JSONRingType, error) {
-	url := fmt.Sprintf("http://%s/hashring", HostPort)
+func GetSingleHashRing(hostport string) (*JSONRingType, error) {
+	url := fmt.Sprintf("http://%s/hashring", hostport)
 	server := GetHTTP()
 
 	resp, err := server.Get(url)
@@ -93,12 +93,14 @@ func GetClusterRing() ([]*JSONRingType, error) {
 
 	if !hash[master.Name] {
 		log.Printf("Cluster inconsistent: Initial buckyd daemon not in hashring.")
+		log.Printf("Hashring: %s", master.String())
 		return nil, fmt.Errorf("Initial buckyd daemon not in hashring.")
 	}
 
 	comm := make(chan *JSONRingType, 10)
 	// XXX: This queries the initial daemon twice.  Good?/Bad?
 	for k := range hash {
+		//log.Printf("Querying %s for hashring status.", k)
 		go fetchRingWorker(k, comm)
 	}
 
