@@ -138,23 +138,52 @@ func IsHealthy(ring []*JSONRingType) bool {
 	return true
 }
 
-// serversCommand runs this subcommand.
-func serversCommand(c Command) int {
+// GetRings returns a slice of JSONRingTypes and honors SingleHost
+func GetRings() []*JSONRingType {
 	var rings []*JSONRingType
 	var err error
 
 	if SingleHost {
 		ring, err := GetSingleHashRing(HostPort)
 		if err != nil {
-			return 1
+			return nil
 		}
 		rings = make([]*JSONRingType, 0)
 		rings = append(rings, ring)
 	} else {
 		rings, err = GetClusterRing()
 		if err != nil {
-			return 1
+			return nil
 		}
+	}
+
+	return rings
+}
+
+// GetAllBuckyd returns a []string of all known buckyd daemons by checking
+// the consistent hash rings.  Each string is in the format of HOST:PORT
+func GetAllBuckyd() []string {
+	rings := GetRings()
+	if rings == nil {
+		return nil
+	}
+	if !IsHealthy(rings) {
+		log.Printf("Cluster is inconsistent. Use the servers command to investigate.")
+		return nil
+	}
+
+	results := make([]string, 0)
+	for _, r := range rings {
+		results = append(results, fmt.Sprintf("%s:%s", r.Name, GetBuckyPort()))
+	}
+	return results
+}
+
+// serversCommand runs this subcommand.
+func serversCommand(c Command) int {
+	rings := GetRings()
+	if rings != nil {
+		return 1
 	}
 
 	if JSONOutput {
@@ -172,10 +201,10 @@ func serversCommand(c Command) int {
 				fmt.Printf("\t%s\n", node)
 			}
 		}
-		if !IsHealthy(rings) {
-			log.Printf("Cluster is inconsistent.")
-			return 1
-		}
+	}
+	if !IsHealthy(rings) {
+		log.Printf("Cluster is inconsistent.")
+		return 1
 	}
 
 	return 0
