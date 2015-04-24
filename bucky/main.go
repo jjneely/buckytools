@@ -39,6 +39,7 @@ type Command struct {
 
 type CommandList []Command
 
+// All the registered commands
 var commands CommandList = make(CommandList, 0)
 
 // Commands are sorted for output sanity...
@@ -73,6 +74,8 @@ func NewCommand(run func(c Command) int, name, usage, short, long string) Comman
 func usage() {
 	t := []string{
 		"%s <sub-command> [options]\n",
+		"Copyright 2015 42 Lines, Inc\n",
+		"Original Author: Jack Neely <jjneely@42lines.net>\n",
 		"Version: %s\n\n",
 		"\tBucky is a CLI designed to work with large consistent hashing\n",
 		"\tGraphite clusters that have the buckyd daemon installed.  Sub-\n",
@@ -83,12 +86,12 @@ func usage() {
 	}
 
 	fmt.Fprintf(os.Stderr, strings.Join(t, ""), os.Args[0], Version)
-	os.Exit(1)
 }
 
 func main() {
 	if len(os.Args) < 2 {
 		usage()
+		os.Exit(1)
 	}
 
 	sort.Sort(commands)
