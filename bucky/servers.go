@@ -182,7 +182,7 @@ func GetAllBuckyd() []string {
 // serversCommand runs this subcommand.
 func serversCommand(c Command) int {
 	rings := GetRings()
-	if rings != nil {
+	if rings == nil {
 		return 1
 	}
 
