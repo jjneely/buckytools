@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -50,10 +50,13 @@ output.`
 // retrieve metrics from a remote buckyd daemon.  This can be a GET/POST
 // with various query parameters as specified by the REST API notes.  This
 // blocks if the remote daemon is building its metric cache (202 code)
-// and returns a slice of strings after a successful 200 and parsing
-// of the JSON data.
-func getMetricCache(r *http.Request) ([]string, error) {
+// and returns a map of slices of strings after a successful 200 and parsing
+// of the JSON data.  Map is server => metrics.
+func getMetricCache(r *http.Request) (map[string][]string, error) {
 	resp, err := HTTPFetch(r)
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
@@ -62,6 +65,7 @@ func getMetricCache(r *http.Request) ([]string, error) {
 		return nil, err
 	}
 
+	host := strings.Split(r.URL.Host, ":")[0]
 	metrics := make([]string, 0)
 	blob, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -74,8 +78,8 @@ func getMetricCache(r *http.Request) ([]string, error) {
 		return nil, err
 	}
 
-	log.Printf("%s returned %d metrics", r.URL.Host, len(metrics))
-	return metrics, nil
+	log.Printf("%s returned %d metrics", host, len(metrics))
+	return map[string][]string{host: metrics}, nil
 }
 
 // HTTPFetch attempts to execute an *http.Request with a Fibonacci backoff
@@ -105,7 +109,7 @@ func HTTPFetch(r *http.Request) (*http.Response, error) {
 		resp, err = httpClient.Do(r)
 		if err != nil {
 			log.Printf("Error communicating: %s", err)
-			continue // We heard from the client recently, try again
+			return nil, err
 		}
 	}
 
@@ -115,9 +119,9 @@ func HTTPFetch(r *http.Request) (*http.Response, error) {
 // multiplexListRequests issues the given slice of Requests in parallel
 // and merges the results.  The error will indicate an error with
 // one or more http request/response that has already been handled.
-func multiplexListRequests(r []*http.Request) ([]string, error) {
+func multiplexListRequests(r []*http.Request) (map[string][]string, error) {
 	var wg sync.WaitGroup
-	comms := make(chan []string, 10)
+	comms := make(chan map[string][]string, 10)
 	wg.Add(len(r))
 	errors := false
 
@@ -138,15 +142,14 @@ func multiplexListRequests(r []*http.Request) ([]string, error) {
 		close(comms)
 	}()
 
-	results := make([]string, 0)
-	for i := range comms {
-		for _, v := range i {
-			// consume the slice of strings
-			results = append(results, v)
+	results := make(map[string][]string)
+	for hash := range comms {
+		for k, v := range hash {
+			// We only get one k/v pair for each hash off the channel
+			results[k] = v
 		}
 	}
 
-	sort.Strings(results)
 	if errors {
 		return results, fmt.Errorf("Errors occured fetching metric keys.")
 	}
@@ -155,8 +158,8 @@ func multiplexListRequests(r []*http.Request) ([]string, error) {
 
 // ListAllMetrics interates through the host:port strings given in servers
 // contact those buckyd daemons, gets the list of all known metrics on that
-// server, merges them into one slice of strings that is returned.
-func ListAllMetrics(servers []string, force bool) ([]string, error) {
+// server, returns a map of server => list of metrics
+func ListAllMetrics(servers []string, force bool) (map[string][]string, error) {
 	requests := make([]*http.Request, 0)
 
 	for _, buckyd := range servers {
@@ -178,8 +181,8 @@ func ListAllMetrics(servers []string, force bool) ([]string, error) {
 
 // ListRegexMetrics queries buckyd daemons specified in servers for all
 // metrics matching the given regex.  If successful matching metrics from
-// all servers are merged into one slice of strings and returned.
-func ListRegexMetrics(servers []string, regex string, force bool) ([]string, error) {
+// all servers returned in a map of server => slice of metrics
+func ListRegexMetrics(servers []string, regex string, force bool) (map[string][]string, error) {
 	requests := make([]*http.Request, 0)
 
 	for _, buckyd := range servers {
@@ -203,8 +206,9 @@ func ListRegexMetrics(servers []string, regex string, force bool) ([]string, err
 
 // ListSliceMetrics queries buckyd daemons specified in servers for all
 // metrics that are known by that buckyd daemon and listed in the slice
-// metrics.  Results from all servers are merged and returned.
-func ListSliceMetrics(servers []string, metrics []string, force bool) ([]string, error) {
+// metrics.  Results from all servers are returned in a map of server =>
+// slice of metrics.
+func ListSliceMetrics(servers []string, metrics []string, force bool) (map[string][]string, error) {
 	requests := make([]*http.Request, 0)
 
 	for _, buckyd := range servers {
@@ -219,11 +223,12 @@ func ListSliceMetrics(servers []string, metrics []string, force bool) ([]string,
 			return nil, err
 		}
 		data.Set("list", string(blob))
-		r, err := http.NewRequest("POST", u, bytes.NewBufferString(data.Encode()))
+		r, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
 		if err != nil {
 			log.Printf("Building request object for %s failed.", buckyd)
 			return nil, err
 		}
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		requests = append(requests, r)
 	}
 
@@ -233,8 +238,8 @@ func ListSliceMetrics(servers []string, metrics []string, force bool) ([]string,
 // ListJSONMetrics queries buckyd daemons specified in servers for all
 // metrics known to that buckyd daemon and that are present in the
 // io.Reader interface which points to a data source containing a JSON
-// array.  Results are merged and returned.
-func ListJSONMetrics(servers []string, fd io.Reader, force bool) ([]string, error) {
+// array.  Results are returned in a map of server => metrics.
+func ListJSONMetrics(servers []string, fd io.Reader, force bool) (map[string][]string, error) {
 	// Read the JSON from the file-like object
 	blob, err := ioutil.ReadAll(fd)
 	metrics := make([]string, 0)
@@ -257,7 +262,7 @@ func listCommand(c Command) int {
 		return 1
 	}
 
-	var list []string
+	var list map[string][]string
 	var err error
 	if c.Flag.NArg() == 0 {
 		list, err = ListAllMetrics(servers, listForce)
@@ -269,8 +274,17 @@ func listCommand(c Command) int {
 		list, err = ListJSONMetrics(servers, os.Stdin, listForce)
 	}
 
+	// Merge and sort the results
+	results := make([]string, 0)
+	for _, v := range list {
+		for _, m := range v {
+			results = append(results, m)
+		}
+	}
+	sort.Strings(results)
+
 	if JSONOutput {
-		blob, err := json.Marshal(list)
+		blob, err := json.Marshal(results)
 		if err != nil {
 			log.Printf("%s", err)
 		} else {
@@ -278,7 +292,7 @@ func listCommand(c Command) int {
 			os.Stdout.Write([]byte("\n"))
 		}
 	} else {
-		for _, v := range list {
+		for _, v := range results {
 			fmt.Printf("%s\n", v)
 		}
 	}
