@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
+	//"time"
 )
 
 // HttpClient is a cached http.Client. Use GetHTTP() to setup and return.
@@ -21,7 +21,7 @@ func GetHTTP() *http.Client {
 	httpClient = new(http.Client)
 
 	// Set a 30 second timeout on all operations
-	httpClient.Timeout = 30 * time.Second
+	//httpClient.Timeout = 30 * time.Second
 
 	return httpClient
 }
