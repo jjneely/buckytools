@@ -42,7 +42,7 @@ output.`
 
 	c.Flag.BoolVar(&listRegexMode, "r", false,
 		"Filter by a regular expression.")
-	c.Flag.BoolVar(&listRegexMode, "f", false,
+	c.Flag.BoolVar(&listForce, "f", false,
 		"Force the remote daemons to rebuild their cache.")
 }
 
