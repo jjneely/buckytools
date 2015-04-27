@@ -23,10 +23,6 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request method.", http.StatusBadRequest)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "GET/POST parameter parsing error.", http.StatusBadRequest)
-		return
-	}
 
 	// Do we need to init the metricsCache?
 	if metricsCache == nil {
@@ -34,7 +30,7 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle case when we are currently building the cache
-	if r.Form.Get("force") != "" && metricsCache.IsAvailable() {
+	if r.FormValue("force") != "" && metricsCache.IsAvailable() {
 		metricsCache.RefreshCache()
 	}
 	metrics, ok := metricsCache.GetMetrics()
@@ -44,7 +40,7 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Options
-	if r.Form.Get("regex") != "" {
+	if r.FormValue("regex") != "" {
 		m, err := FilterRegex(r.Form.Get("regex"), metrics)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -52,7 +48,7 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 		metrics = m
 	}
-	if r.Form.Get("list") != "" {
+	if r.FormValue("list") != "" {
 		filter, err := unmarshalList(r.Form.Get("list"))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
