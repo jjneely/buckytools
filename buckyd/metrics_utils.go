@@ -165,7 +165,7 @@ func (m *MetricsCacheType) RefreshCache() error {
 			return err
 		}
 		if ok {
-			log.Printf("Found %s or %s", path, PathToMetric(path))
+			//log.Printf("Found %s or %s", path, PathToMetric(path))
 			m.metrics = append(m.metrics, PathToMetric(path))
 		}
 		return nil
@@ -195,6 +195,8 @@ func (m *MetricsCacheType) GetMetrics() ([]string, bool) {
 		return m.metrics, true
 	}
 
-	go m.RefreshCache()
+	if !m.updating {
+		go m.RefreshCache()
+	}
 	return nil, false
 }
