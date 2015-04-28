@@ -15,10 +15,26 @@ import (
 	"time"
 )
 
-// import . "github.com/jjneely/buckytools"
-
 var listRegexMode bool
 var listForce bool
+
+// RetryReader is a buffer for HTTP request bodies that is replayable.
+// As the request transport will close the body after its sent we
+// hook the close to seek back to the begining of the buffer and
+// provide http.NewRequest with an io.ReadCloser.
+type RetryReader struct {
+	*strings.Reader
+}
+
+func (r *RetryReader) Close() error {
+	r.Seek(0, 0)
+	return nil
+}
+
+func NewRetryReader(s string) *RetryReader {
+	reader := strings.NewReader(s)
+	return &RetryReader{reader}
+}
 
 func init() {
 	usage := "[options]"
@@ -223,7 +239,7 @@ func ListSliceMetrics(servers []string, metrics []string, force bool) (map[strin
 			return nil, err
 		}
 		data.Set("list", string(blob))
-		r, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
+		r, err := http.NewRequest("POST", u, NewRetryReader(data.Encode()))
 		if err != nil {
 			log.Printf("Building request object for %s failed.", buckyd)
 			return nil, err
