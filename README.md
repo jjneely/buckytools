@@ -44,12 +44,13 @@ manage large consistent hashing cluster.  Goals:
   * delete metrics that don't belong on each host
   * tar up metrics that don't belong on each host
 
-Go Requirements / Libraries and Tools
-=====================================
+Assumptions
+===========
 
-GoTalk for daemon comms?
+These tools assume the following are true:
 
-    http://rsms.me/2015/01/21/gotalk.html
+* You Graphite carbon-cache servers have one Whisper DB store.  Not multiple
+  mount points with carbon-cache configured with their own DB store.
 
 Notes
 =====
