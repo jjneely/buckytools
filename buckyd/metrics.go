@@ -41,7 +41,7 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 
 	// Options
 	if r.FormValue("regex") != "" {
-		m, err := FilterRegex(r.Form.Get("regex"), metrics)
+		m, err := FilterRegex(r.FormValue("regex"), metrics)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -49,7 +49,7 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 		metrics = m
 	}
 	if r.FormValue("list") != "" {
-		filter, err := unmarshalList(r.Form.Get("list"))
+		filter, err := unmarshalList(r.FormValue("list"))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
