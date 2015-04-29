@@ -164,7 +164,7 @@ func (t *HashRing) GetNode(key string) Node {
 	//log.Printf("len(ring) = %d", len(t.ring))
 	//log.Printf("Bisect index for %s is %d", key, i)
 	//log.Printf("Ring position for %s is %x", key, e.position)
-	return t.ring[i].node
+	return t.ring[i%len(t.ring)].node
 }
 
 func (t *HashRing) GetNodes(key string) []Node {
@@ -175,7 +175,7 @@ func (t *HashRing) GetNodes(key string) []Node {
 	result := make([]Node, 0)
 	seen := make(map[string]bool)
 	e := RingEntry{computeRingPosition(key), NewNode(key, "")}
-	index := bisect(t.ring, e)
+	index := bisect(t.ring, e) % len(t.ring)
 	last := index - 1
 
 	for len(seen) < len(t.nodes) && index != last {
