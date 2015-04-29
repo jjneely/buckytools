@@ -179,6 +179,26 @@ func GetAllBuckyd() []string {
 	return results
 }
 
+// GetAllServers returns a []string of all known Graphite servers in the
+// cluster as found in the consistent hash rings.  No port information is
+// included.
+func GetAllServers() []string {
+	rings := GetRings()
+	if rings == nil {
+		return nil
+	}
+	if !IsHealthy(rings) {
+		log.Printf("Cluster is inconsistent. Use the servers command to investigate.")
+		return nil
+	}
+
+	results := make([]string, 0)
+	for _, r := range rings {
+		results = append(results, r.Name)
+	}
+	return results
+}
+
 // serversCommand runs this subcommand.
 func serversCommand(c Command) int {
 	rings := GetRings()
