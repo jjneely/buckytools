@@ -17,6 +17,7 @@ import (
 
 var listRegexMode bool
 var listForce bool
+var listLocation bool
 
 // RetryReader is a buffer for HTTP request bodies that is replayable.
 // As the request transport will close the body after its sent we
@@ -37,7 +38,7 @@ func NewRetryReader(s string) *RetryReader {
 }
 
 func init() {
-	usage := "[options]"
+	usage := "[options] <metric expression>"
 	short := "List out matching metrics."
 	long := `Dump to STDOUT text or JSON of matching metrics.  Without any
 arguments / options this will list every metric in the cluster.
@@ -49,7 +50,11 @@ then read a JSON array from STDIN as our list of metrics.
 
 Use -r to enable regular expression mode.  The first argument is a
 regular expression.  If metrics names match they will be included in the
-output.`
+output.
+
+With -l we list the server that the metric resides on.  This is the
+actual location of the metric and not the location computed by the
+consistent hash ring.  Combined with -j the JSON output will be a hash.`
 
 	c := NewCommand(listCommand, "list", usage, short, long)
 	SetupHostname(c)
@@ -60,6 +65,8 @@ output.`
 		"Filter by a regular expression.")
 	c.Flag.BoolVar(&listForce, "f", false,
 		"Force the remote daemons to rebuild their cache.")
+	c.Flag.BoolVar(&listLocation, "l", false,
+		"List the metric's real relocation.")
 }
 
 // getMetricCache accepts an *http.Request type that defines a request to
@@ -290,17 +297,28 @@ func listCommand(c Command) int {
 		list, err = ListJSONMetrics(servers, os.Stdin, listForce)
 	}
 
-	// Merge and sort the results
 	results := make([]string, 0)
-	for _, v := range list {
-		for _, m := range v {
-			results = append(results, m)
+	if listLocation {
+		for _, v := range list {
+			sort.Strings(v)
 		}
+	} else {
+		// Merge and sort the results
+		for _, v := range list {
+			for _, m := range v {
+				results = append(results, m)
+			}
+		}
+		sort.Strings(results)
 	}
-	sort.Strings(results)
 
 	if JSONOutput {
-		blob, err := json.Marshal(results)
+		var blob []byte
+		if listLocation {
+			blob, err = json.Marshal(list)
+		} else {
+			blob, err = json.Marshal(results)
+		}
 		if err != nil {
 			log.Printf("%s", err)
 		} else {
@@ -308,8 +326,16 @@ func listCommand(c Command) int {
 			os.Stdout.Write([]byte("\n"))
 		}
 	} else {
-		for _, v := range results {
-			fmt.Printf("%s\n", v)
+		if listLocation {
+			for server, metrics := range list {
+				for _, m := range metrics {
+					fmt.Printf("%s: %s\n", server, m)
+				}
+			}
+		} else {
+			for _, v := range results {
+				fmt.Printf("%s\n", v)
+			}
 		}
 	}
 
