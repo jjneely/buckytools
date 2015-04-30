@@ -98,12 +98,10 @@ func TestGraphiteCompatible(t *testing.T) {
 
 	// A known mapping of keys to nodes from Graphite's Python implementation
 	expected := map[string]string{
-		"1sec.mysql.db109-shard7-g5.4417.Com_help": "graphite015-g5:a",
-		"5min.tomcat.requests.mobile-api-tier.api047-g4_prod_dal05_fitbit_com.page_types.FitbitApiSleepActionBean_getList_GET.logged_in_free.all_bins.responseTime.percentile.90th": "graphite010-g5:c",
-		"1min.statsd.prod.firmware.7_62.annotations.watchdog.115.rate":                                                                                                              "graphite010-g5:b",
-		"10min.sar.disk_stats.app-test-57164838110fc9dc.sda.wr_sec":                                                                                                                 "graphite010-g5:a",
-		"1min.statsd.prod.memcached.heartbeat.failed.search027-g4.prod.dal05.fitbit.com.10_62_68_150_11211.count":                                                                   "graphite013-g5:a",
-		"1min.statsd.prod.intercom.corporate.challenge.participation.count_95":                                                                                                      "graphite015-g5:c",
+		"1sec.mysql.db109-shard7-g5.4417.Com_help":                             "graphite015-g5:a",
+		"10min.sar.disk_stats.app-test-57164838110fc9dc.sda.wr_sec":            "graphite010-g5:a",
+		"1min.statsd.prod.intercom.corporate.challenge.participation.count_95": "graphite015-g5:c",
+		"10min.sar.disk_stats.db047-shard35-g4.sda.rd_sec":                     "graphite010-g5:a",
 	}
 
 	for k, v := range expected {
