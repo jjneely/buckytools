@@ -314,9 +314,9 @@ func listCommand(c Command) int {
 	if JSONOutput {
 		var blob []byte
 		if listLocation {
-			blob, err = json.Marshal(list)
+			blob, err = json.MarshalIndent(list, "", "\t")
 		} else {
-			blob, err = json.Marshal(results)
+			blob, err = json.MarshalIndent(results, "", "\t")
 		}
 		if err != nil {
 			log.Printf("%s", err)

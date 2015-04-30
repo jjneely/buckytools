@@ -88,3 +88,23 @@ func SetupJSON(c Command) {
 	c.Flag.BoolVar(&JSONOutput, "json", false,
 		"Instead of text ouput JSON encoded data.")
 }
+
+// CleanMetric sanitizes the givem metric key by removing adjacent "."
+// characters and replacing any "/" characters with "."
+func CleanMetric(m string) string {
+	// Slash isn't really illegal but gets interperated as a directory
+	// on the Graphite server
+	m = strings.Replace(m, "/", ".", -1)
+
+	// Adjacent "." end up producing non-normalized paths
+	for strings.Index(m, "..") != -1 {
+		m = strings.Replace(m, "..", ".", -1)
+	}
+
+	// Can't begin with a "."
+	if strings.Index(m, ".") == 0 {
+		m = m[1:]
+	}
+
+	return m
+}
