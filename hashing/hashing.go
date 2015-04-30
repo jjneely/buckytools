@@ -53,12 +53,25 @@ func computeRingPosition(key string) (result int) {
 	return
 }
 
-// bisect returns the insertion index where e should be inserted into ring
+// bisectLeft returns the insertion index where e should be inserted into ring
 // if duplicate e's are already in the list the insertion point will be to the
 // left or before the equal entries.
-func bisect(ring []RingEntry, e RingEntry) (i int) {
+func bisectLeft(ring []RingEntry, e RingEntry) (i int) {
 	for i = 0; i < len(ring); i++ {
 		if ring[i].position >= e.position {
+			break
+		}
+	}
+
+	return i
+}
+
+// bisectRight returns the insertion index where e should be inserted into ring
+// if duplicate e's are already in the list the insertion point will be to the
+// right or after the equal entries.
+func bisectRight(ring []RingEntry, e RingEntry) (i int) {
+	for i = 0; i < len(ring); i++ {
+		if ring[i].position > e.position {
 			break
 		}
 	}
@@ -70,7 +83,7 @@ func bisect(ring []RingEntry, e RingEntry) (i int) {
 // order.  An updated []RingEntry slice is returned
 func insertRing(ring []RingEntry, e RingEntry) []RingEntry {
 	// Find where e goes in the ring
-	i := bisect(ring, e)
+	i := bisectRight(ring, e)
 
 	// Extend the underlying array if needed
 	ring = append(ring, e)
@@ -160,11 +173,11 @@ func (t *HashRing) GetNode(key string) Node {
 	}
 
 	e := RingEntry{computeRingPosition(key), NewNode(key, "")}
-	i := bisect(t.ring, e)
+	i := mod(bisectLeft(t.ring, e), len(t.ring))
 	//log.Printf("len(ring) = %d", len(t.ring))
 	//log.Printf("Bisect index for %s is %d", key, i)
 	//log.Printf("Ring position for %s is %x", key, e.position)
-	return t.ring[i%len(t.ring)].node
+	return t.ring[i].node
 }
 
 func (t *HashRing) GetNodes(key string) []Node {
@@ -175,7 +188,7 @@ func (t *HashRing) GetNodes(key string) []Node {
 	result := make([]Node, 0)
 	seen := make(map[string]bool)
 	e := RingEntry{computeRingPosition(key), NewNode(key, "")}
-	index := bisect(t.ring, e) % len(t.ring)
+	index := mod(bisectLeft(t.ring, e), len(t.ring))
 	last := index - 1
 
 	for len(seen) < len(t.nodes) && index != last {
@@ -184,10 +197,15 @@ func (t *HashRing) GetNodes(key string) []Node {
 			seen[next.node.String()] = true
 			result = append(result, next.node)
 		}
-		index = (index + 1) % len(t.ring)
+		index = mod((index + 1), len(t.ring))
 	}
 
 	return result
+}
+
+// mod returns a modulo b which is not the same as Go's a % b operator.
+func mod(a, b int) int {
+	return a - (b * (a / b))
 }
 
 func main() {
