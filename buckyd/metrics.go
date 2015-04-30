@@ -29,6 +29,12 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 		metricsCache = NewMetricsCache()
 	}
 
+	// XXX: Calling r.FormValue will set a safety limit on the size of
+	// the body of 10MiB which may be small for the amount of JSON data
+	// included in a list command.  Set the limit higher here.  How
+	// can we do this better?  This is 160MiB.
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<24)
+
 	// Handle case when we are currently building the cache
 	if r.FormValue("force") != "" && metricsCache.IsAvailable() {
 		metricsCache.RefreshCache()
