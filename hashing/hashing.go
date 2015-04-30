@@ -3,7 +3,7 @@ package hashing
 import (
 	"crypto/md5"
 	"fmt"
-	"log"
+	//"log"
 	"strings"
 )
 
