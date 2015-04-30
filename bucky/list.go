@@ -195,7 +195,6 @@ func ListAllMetrics(servers []string, force bool) (map[string][]string, error) {
 		if force {
 			r.Form.Set("force", "true")
 		}
-		log.Printf("Built Request for %s", buckyd)
 		requests = append(requests, r)
 	}
 

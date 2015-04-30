@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -33,18 +34,13 @@ Use bucky rebalance to correct.`
 		"Force the remote daemons to rebuild their cache.")
 }
 
-// inconsistentCommand runs this subcommand.
-func inconsistentCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
-		return 1
-	}
-
+func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 	var list map[string][]string
 	var err error
-	list, err = ListAllMetrics(servers, listForce)
+	list, err = ListAllMetrics(hostports, listForce)
 	if err != nil {
-		log.Fatalf("Error retrieving metric lists: %s", err)
+		log.Printf("Error retrieving metric lists: %s", err)
+		return nil, err
 	}
 
 	results := make(map[string][]string)
@@ -53,6 +49,11 @@ func inconsistentCommand(c Command) int {
 	t := time.Now().Unix()
 	for server, metrics := range list {
 		for _, m := range metrics {
+			if strings.HasPrefix(m, "carbon.agents.") {
+				// These metrics are inserted into the stream after hashing
+				// is done.  They will never be consistent and shouldn't be.
+				continue
+			}
 			if ring.GetNode(m).Server != server {
 				results[server] = append(results[server], m)
 			}
@@ -66,6 +67,18 @@ func inconsistentCommand(c Command) int {
 		sort.Strings(metrics)
 	}
 
+	return results, nil
+}
+
+// inconsistentCommand runs this subcommand.
+func inconsistentCommand(c Command) int {
+	servers := GetAllBuckyd()
+	if servers == nil {
+		return 1
+	}
+
+	var err error
+	results, err := InconsistentMetrics(servers)
 	if JSONOutput {
 		blob, err := json.Marshal(results)
 		if err != nil {
