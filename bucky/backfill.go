@@ -21,7 +21,7 @@ type MigrateWork struct {
 func init() {
 	usage := "[options] <file containing JSON map>"
 	short := "Backfill or rename old metrics to new."
-	long := `Merge data from an old metric into a new metric name."
+	long := `Merge data from an old metric into a new metric name.
 
 Backfill will non-destructively fill a new metric with data from the old.
 It uses the same algorithm as whisper-fill.py which fills in missing data
@@ -100,6 +100,14 @@ func BackfillMetrics(metricMap map[string]string) error {
 		return err
 	}
 
+	// re-create our map, so that we spread out load, and lessen complexity
+	backfillJob := make(map[string]string)
+	for server, metrics := range locations {
+		for _, m := range metrics {
+			backfillJob[m] = server
+		}
+	}
+
 	workIn := make(chan *MigrateWork, 25)
 	wg := new(sync.WaitGroup)
 	wg.Add(metricWorkers)
@@ -107,15 +115,19 @@ func BackfillMetrics(metricMap map[string]string) error {
 		go backfillWorker(workIn, wg)
 	}
 
-	for server, metrics := range locations {
-		for _, m := range metrics {
-			work := new(MigrateWork)
-			work.oldName = m
-			work.newName = CleanMetric(metricMap[m])
-			work.oldLocation = server
-			work.newLocation = hr.GetNode(work.newName).Server
+	c := 0
+	l := len(backfillJob)
+	for m, server := range backfillJob {
+		work := new(MigrateWork)
+		work.oldName = m
+		work.newName = CleanMetric(metricMap[m])
+		work.oldLocation = server
+		work.newLocation = hr.GetNode(work.newName).Server
 
-			workIn <- work
+		workIn <- work
+		c++
+		if c%10 == 0 {
+			log.Printf("Progress %d / %d: %.2f", c, l, 100*float64(c)/float64(l))
 		}
 	}
 

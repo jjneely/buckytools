@@ -189,11 +189,17 @@ func multiplexTar(metricMap map[string][]string) error {
 	}
 
 	// Feed work in
+	c := 0
+	l := len(sorted)
 	for _, m := range sorted {
 		work := new(MetricWork)
 		work.Name = m
 		work.Server = servers[m]
 		workIn <- work
+		c++
+		if c%10 == 0 {
+			log.Printf("Progress %d / %d: %.2f", c, l, 100*float64(c)/float64(l))
+		}
 	}
 	close(workIn)
 	wgWork.Wait()
