@@ -1,0 +1,11 @@
+The Debian Package buckytools
+----------------------------
+
+This package is simply a package around pre-built binaries.  The build process
+of this package does not build the Go source.  This package should be
+re-made to properly build in pbuilder, however we need newer versions
+of the Go compiler and to work on Precise and Trusty.
+
+Perhaps some PPAs or the like might be in order here.
+
+ -- Jack Neely <jjneely@42lines.net>  Mon, 04 May 2015 13:26:40 -0500
