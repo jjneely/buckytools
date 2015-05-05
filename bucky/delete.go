@@ -41,10 +41,46 @@ BUCKYSERVER environment variable.`
 		"Force metric re-inventory.")
 }
 
+func DeleteMetric(server, metric string) error {
+	httpClient := GetHTTP()
+	u := fmt.Sprintf("http://%s:%s/metrics/%s", server, GetBuckyPort(), metric)
+	r, err := http.NewRequest("DELETE", u, nil)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return err
+	}
+
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error communicating: %s", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case 200:
+		log.Printf("DELETED: %s", metric)
+	case 404:
+		log.Printf("Not found / Not deleted: %s", metric)
+		return fmt.Errorf("Metric not found.")
+	case 500:
+		msg, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			msg = []byte(err.Error())
+		}
+		log.Printf("Error: Internal Server Error: %s", string(msg))
+		return fmt.Errorf("Error: Internal Server Error: %s", string(msg))
+	default:
+		log.Printf("Error: Unknown response from server.  Code %s", resp.Status)
+		return fmt.Errorf("Unknown response from server.  Code %s", resp.Status)
+	}
+
+	return nil
+}
+
 func deleteMetrics(metricMap map[string][]string) error {
 	// XXX: This should be a quick operation so we do not attempt
 	// to parallelize with multiple go routines.
-	httpClient := GetHTTP()
 	errors := false
 	for server, metrics := range metricMap {
 		if len(metrics) == 0 {
@@ -56,38 +92,10 @@ func deleteMetrics(metricMap map[string][]string) error {
 		}
 		log.Printf("Deleting %d metrics on %s...", len(metrics), server)
 		for _, m := range metrics {
-			u := fmt.Sprintf("http://%s:%s/metrics/%s", server, GetBuckyPort(), m)
-			r, err := http.NewRequest("DELETE", u, nil)
+			err := DeleteMetric(server, m)
 			if err != nil {
-				log.Printf("Error building request: %s", err)
-				errors = true
-				continue
-			}
-
-			resp, err := httpClient.Do(r)
-			if err != nil {
-				log.Printf("Error communicating: %s", err)
-				errors = true
-				continue
-			}
-
-			switch resp.StatusCode {
-			case 200:
-				log.Printf("DELETED: %s", m)
-			case 404:
-				log.Printf("Not found / Not deleted: %s", m)
-			case 500:
-				msg, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					msg = []byte(err.Error())
-				}
-				log.Printf("Error: Internal Server Error: %s", string(msg))
-				errors = true
-			default:
-				log.Printf("Error: Unknown response from server.  Code %s", resp.Status)
 				errors = true
 			}
-			resp.Body.Close()
 		}
 	}
 

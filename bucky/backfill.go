@@ -60,7 +60,9 @@ DBs to the remote servers.`
 
 func backfillWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
 	for work := range workIn {
-		log.Printf("Backfilling %s => %s", work.oldName, work.newName)
+		log.Printf("Backfilling [%s] %s => [%s] %s",
+			work.oldLocation, work.oldName,
+			work.newLocation, work.newName)
 		metric, err := GetMetricData(work.oldLocation, work.oldName)
 		if err != nil {
 			// errors already handled
