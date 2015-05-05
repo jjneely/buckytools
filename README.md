@@ -1,10 +1,17 @@
 Go Buckytools
 ==============
 
-Buckyballs and buckytubes are fullerene of carbon or carbon molecules such
-as a Buckminsterfullerene.  They are similar to graphite but the carbon
-structures are regular.  Hopefully, this code will allow multiple Graphite
-servers to work and scale better together.
+Tools for managing large consistent hashing Graphite clusters.
+
+Buckminster (Bucky) Fuller once said,
+
+> If you want to teach people a new way of thinking, don’t bother trying to teach
+> them. Instead, give them a tool, the use of which will lead to new ways of
+> thinking.
+
+Carbon molecules known as fullerenes were also named after Bucky due
+to their geodesic arrangement of atoms.  So, this is my contribution
+to the Graphite naming scheme.
 
 When working large consistent hashing Graphite clusters doing simple
 maintenance can involve a lot of data moving around.  Normally, one would reach
@@ -25,24 +32,37 @@ stack up you start to find scaling problems:
   difficult
 
 So I wanted to use the speed of Go to build more efficient tools to help
-manage large consistent hashing cluster.  Goals:
+manage large consistent hashing cluster.
 
-* Make a whisper-fill compatible binary that's an order of magnitude
-  faster
-* Make an atomic operation to rebalance or relocate an existing metric
-  or close to it
-* Build some higher level useful tools for managing a cluster:
-  * Build Graphite webui's search index
-  * Make arbitrary tar files of metrics
-  * List metrics from regex/list
-  * Fetch/Ship raw WSP data
-  * Find/relocate metrics in the wrong place
-  * Rename/backfill from regex or hash/list
-  * Restore arbitrary tar files of metrics
-  * Sanity, clean empty directories
-  * delete metrics from list/regex
-  * delete metrics that don't belong on each host
-  * tar up metrics that don't belong on each host
+Tools
+=====
+
+These are the tools included and their functionality.
+
+* **bucky-fill** -- A `whisper-fill` compatible utility that is nearly
+  an order of magnitude faster.
+* **bucky-isempty** -- A utility for discovering WSP databases that
+  contain no valid data points.
+* **buckyd** -- A daemon for each Graphite node that tracks the
+  configuration of the hash ring and exposes a REST API for
+  interacting with the raw metric DBs on disk.
+* **bucky** -- Command line Graphite cluster manager.  Modules:
+  * **backfill** -- Backfill old metrics into new names.
+  * **delete** -- Delete metrics via list or regular expression.
+  * **inconsistent** -- Find metrics that are stored in the wrong server
+    according to the hash ring.
+  * **list** -- Discover and verify metrics.
+  * **locate** -- Calculate metric locations from the hash ring.
+  * **rebalance** -- Move inconsistent metrics to the correct location
+    and delete the source immediately after successful backfill.
+  * **restore** -- Restore from a tar archive.
+  * **severs** -- List each server's known hash ring and verify that
+    all hash rings are consistent.
+  * **tar** -- Make an archive of a list or regular expression of metric
+    names and dump it in tar format to STDOUT.
+
+The heavy lifting commands use a set of worker threads to do IO work
+which can be set at the command line with -w.
 
 Assumptions
 ===========
@@ -51,24 +71,68 @@ These tools assume the following are true:
 
 * You Graphite carbon-cache servers have one Whisper DB store.  Not multiple
   mount points with carbon-cache configured with their own DB store.
+* Your hash ring is set to a REPLICATION_FACTOR of 1
 
-Notes
-=====
+These aren't set in stone, just what I was working with as I built the tool.
 
-I have a set of tasks written in Fabric that do this for me currently.  They
-are slow and poor in many ways.  I want to replace them with this code base.
-The Fabric tasks are:
+Daemon Usage
+============
 
-    graphite2.backfill
-    graphite2.backfillFromMap
-    graphite2.deleteDontBelong
-    graphite2.deleteEmptyDirectories
-    graphite2.deleteMetrics
-    graphite2.migrate
-    graphite2.restoreTar
-    graphite2.sanity
-    graphite2.showDontBelong
-    graphite2.showMetrics
-    graphite2.tar
-    graphite2.tarDontBelong
+Each data storage node in the Graphite cluster needs a **buckyd** daemon
+running as the same user as the other Graphite tools.  I use an Upstart
+job to keep mine running.  The important bit here is that you must
+pass to the daemon as arguments the members of the consistent hash ring.
 
+    $ cat /etc/init/buckyd.conf
+    description "Buckyd Daemon for Managing Graphite Clusters"
+    author      "Jack Neely <jjneely@42lines.net>"
+
+    setuid graphite
+
+    exec /path/to/buckyd --node graphite010-g5 \
+        -b 192.168.1.1:5678 \
+	graphite010-g5:a graphite010-g5:b \
+	graphite011-g5:a graphite011-g5:b \
+	graphite012-g5:a graphite012-g5:b
+
+Here `--node` is the name of this Graphite node (if different from what
+is derived from the host name).  `-b` or `--bind` is the address to bind
+to.  You can also specify `--prefix`` where your Whisper data store is
+and `--tmpdir` where the daemon can write temporary files.
+
+This exposes a REST API that is documented in REST_API_NOTES.md.
+
+Client Usage
+============
+
+The **bucky** tool is self documenting.  You can run:
+
+    bucky help
+
+to see a list of modules and available flags and what arguments are needed.
+Detailed help is available by specifying a module name:
+
+    bucky help backfill
+
+Most commands need a `--host` or `-h` flag to specify the initial Graphite
+host to connect to where the client will discover the entire hash ring.
+You can also set the `BUCKYHOST` environment variable rather than
+specify this flag for each command.
+
+Other common flags are:
+
+* `-s` Operate only on the initial Graphite host.
+* `-f` Requests the remote daemon to refresh its cache of local metrics.
+* `-j` Read from STDIN or dump to STDOUT JSON data rather than text.
+* `-r` Regular expression mode.
+* `-w` Number of worker threads.
+
+To Do / Bugs
+============
+
+* Authentication -- Negotiate and Kerberos support.  Probably Basic as well.
+* Code clean up -- I wrote a lot of this quickly, it needs love in a
+  lot of places.
+* Make all modules aware of possible duplicate metrics.
+* Delete module should use worker threads.
+* Speed testing and improvements.
