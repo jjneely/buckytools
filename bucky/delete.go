@@ -8,10 +8,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 )
 
 var deleteRegexMode bool
 var deleteForce bool
+
+type DeleteWork struct {
+	server string
+	name   string
+}
 
 func init() {
 	usage := "[options] <metric expression>"
@@ -39,6 +45,8 @@ BUCKYSERVER environment variable.`
 		"No confirmation.")
 	c.Flag.BoolVar(&listForce, "f", false,
 		"Force metric re-inventory.")
+	c.Flag.IntVar(&metricWorkers, "w", 5,
+		"Downloader threads.")
 }
 
 func DeleteMetric(server, metric string) error {
@@ -78,10 +86,25 @@ func DeleteMetric(server, metric string) error {
 	return nil
 }
 
+func deleteWorker(workIn chan *DeleteWork, wg *sync.WaitGroup) {
+	for work := range workIn {
+		err := DeleteMetric(work.server, work.name)
+		if err != nil {
+			workerErrors = true
+		}
+	}
+	wg.Done()
+}
+
 func deleteMetrics(metricMap map[string][]string) error {
-	// XXX: This should be a quick operation so we do not attempt
-	// to parallelize with multiple go routines.
-	errors := false
+	wg := new(sync.WaitGroup)
+	workIn := make(chan *DeleteWork) // Purposely unbuffered
+
+	wg.Add(metricWorkers)
+	for i := 0; i < metricWorkers; i++ {
+		go deleteWorker(workIn, wg)
+	}
+
 	for server, metrics := range metricMap {
 		if len(metrics) == 0 {
 			continue
@@ -92,14 +115,17 @@ func deleteMetrics(metricMap map[string][]string) error {
 		}
 		log.Printf("Deleting %d metrics on %s...", len(metrics), server)
 		for _, m := range metrics {
-			err := DeleteMetric(server, m)
-			if err != nil {
-				errors = true
-			}
+			work := new(DeleteWork)
+			work.server = server
+			work.name = m
+			workIn <- work
 		}
 	}
 
-	if errors {
+	close(workIn)
+	wg.Wait()
+
+	if workerErrors {
 		return fmt.Errorf("Errors occured in delete operations.")
 	}
 	return nil

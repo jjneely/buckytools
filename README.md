@@ -134,5 +134,4 @@ To Do / Bugs
 * Code clean up -- I wrote a lot of this quickly, it needs love in a
   lot of places.
 * Make all modules aware of possible duplicate metrics.
-* Delete module should use worker threads.
 * Speed testing and improvements.
