@@ -208,6 +208,7 @@ func multiplexTar(metricMap map[string][]string) error {
 	close(workOut)
 	wgTar.Wait() // Wait for tar writer to complete
 
+	log.Printf("Archive complete.")
 	if workerErrors {
 		return fmt.Errorf("Errors building tar file are present.")
 	}

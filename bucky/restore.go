@@ -142,7 +142,9 @@ func RestoreTar(servers []string, fd *os.File) error {
 	close(workIn)
 	wg.Wait()
 
+	log.Printf("Restore complete.")
 	if workerErrors {
+		log.Printf("Errors are present in restore.")
 		return fmt.Errorf("Errors uploading metric data present.")
 	}
 	return nil

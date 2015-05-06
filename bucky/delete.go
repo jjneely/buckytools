@@ -125,7 +125,9 @@ func deleteMetrics(metricMap map[string][]string) error {
 	close(workIn)
 	wg.Wait()
 
+	log.Printf("Delete operation complete.")
 	if workerErrors {
+		log.Printf("Errors occured in delete operation.")
 		return fmt.Errorf("Errors occured in delete operations.")
 	}
 	return nil

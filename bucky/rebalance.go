@@ -139,7 +139,9 @@ func RebalanceMetrics(noDelete bool) error {
 	close(workIn)
 	wg.Wait()
 
+	log.Printf("Rebalance complete.")
 	if workerErrors {
+		log.Printf("Errors are present in rebalance.")
 		return fmt.Errorf("Errors present.")
 	}
 	return nil

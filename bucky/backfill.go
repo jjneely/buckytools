@@ -135,6 +135,11 @@ func BackfillMetrics(metricMap map[string]string) error {
 
 	close(workIn)
 	wg.Wait()
+	log.Printf("Backfill request complete.")
+	if workerErrors {
+		log.Printf("Errors are present.")
+		return fmt.Errorf("Backfill errors are present.")
+	}
 
 	return nil
 }
