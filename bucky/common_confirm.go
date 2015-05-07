@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 // askForConfirmation uses Scanln to parse user input. A user must type in "yes" or "no" and
@@ -29,6 +30,7 @@ func askForConfirmation(prompt string) bool {
 			log.Printf("Error reading confirmation, assuming no: %s", err)
 			return false
 		}
+		response = strings.TrimSpace(response)
 		okayResponses := []string{"y", "Y", "yes", "Yes", "YES"}
 		nokayResponses := []string{"n", "N", "no", "No", "NO"}
 
