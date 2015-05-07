@@ -4,8 +4,10 @@ package main
 // Modified from its original
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"os"
 )
 
 // askForConfirmation uses Scanln to parse user input. A user must type in "yes" or "no" and
@@ -14,12 +16,15 @@ import (
 // until it gets a valid response from the user. Typically, you should use fmt to print out a question
 // before calling askForConfirmation. E.g. fmt.Println("WARNING: Are you sure? (yes/no)")
 func askForConfirmation(prompt string) bool {
-	var response string
+	// Stdin may be redirected, read from console directly
+	console, _ := os.Open("/dev/tty")
+	reader := bufio.NewReader(console)
+
 	if prompt != "" {
 		fmt.Printf("%s ", prompt)
 	}
 	for {
-		_, err := fmt.Scanln(&response)
+		response, err := reader.ReadString('\n')
 		if err != nil {
 			log.Printf("Error reading confirmation, assuming no: %s", err)
 			return false
