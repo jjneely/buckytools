@@ -11,8 +11,9 @@ import (
 )
 
 import . "github.com/jjneely/buckytools"
+import "github.com/jjneely/buckytools/metrics"
 
-var metricsCache *MetricsCacheType
+var metricsCache *metrics.MetricsCacheType
 var tmpDir string
 var hashring JSONRingType
 

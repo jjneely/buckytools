@@ -13,6 +13,7 @@ import (
 )
 
 import "github.com/jjneely/buckytools/hashing"
+import "github.com/jjneely/buckytools/metrics"
 
 var tarPrefix string
 
@@ -122,7 +123,7 @@ func RestoreTar(servers []string, fd *os.File) error {
 		}
 		buf := new(bytes.Buffer)
 		metric := new(MetricData)
-		metric.Name = PathToMetric(filepath.Join(tarPrefix, hdr.Name))
+		metric.Name = metrics.RelativeToMetric(filepath.Join(tarPrefix, hdr.Name))
 		metric.Size = hdr.Size
 		metric.Mode = hdr.Mode
 		metric.ModTime = hdr.ModTime.Unix()
