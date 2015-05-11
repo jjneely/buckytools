@@ -1,15 +1,16 @@
 Source: buckytools
-Section: unknown
+Section: main
 Priority: optional
 Maintainer: Jack Neely <jjneely@42lines.net>
 Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.4
-Homepage: <insert the upstream URL, if relevant>
+Homepage: https://github.com/jjneely/buckytools
 #Vcs-Git: git://git.debian.org/collab-maint/buckytools.git
 #Vcs-Browser: http://git.debian.org/?p=collab-maint/buckytools.git;a=summary
 
 Package: buckytools
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Description: Management tool for large Graphite clusters
+ Buckytools is a Golang server daemon, CLI client and utility programs
+ designed to help manage a large consistent hashing Graphite cluster.
