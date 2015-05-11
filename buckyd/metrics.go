@@ -12,6 +12,7 @@ import (
 )
 
 import . "github.com/jjneely/buckytools"
+import . "github.com/jjneely/buckytools/metrics"
 import "github.com/jjneely/buckytools/fill"
 
 // listMetrics retrieves a list of metrics on the localhost and sends

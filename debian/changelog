@@ -1,3 +1,9 @@
+buckytools (0.0.2) unstable; urgency=low
+
+  * Version bump.
+
+ -- Jack Neely <jjneely@42lines.net>  Fri, 08 May 2015 13:00:00 -0400
+
 buckytools (0.0.1) unstable; urgency=low
 
   * Initial release/packaging.

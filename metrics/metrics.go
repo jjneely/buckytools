@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"flag"
@@ -29,11 +29,23 @@ func init() {
 		"The root of the whisper database store.")
 }
 
+// MetricToPath takes a metric name and return an absolute path
+// using the --prefix flag.
 func MetricToPath(metric string) string {
-	p := strings.Replace(metric, ".", "/", -1) + ".wsp"
+	p := MetricToRelative(metric)
 	return path.Join(Prefix, p)
 }
 
+// MetricToRelative take a metric name and returns a relative path
+// to the Whisper DB.  This path combined with the root path to the
+// DB store would create a proper absolute path.
+func MetricToRelative(metric string) string {
+	p := strings.Replace(metric, ".", "/", -1) + ".wsp"
+	return path.Clean(p)
+}
+
+// MetricsToPaths operates on a slice of metric names and returns a
+// slice of absolute paths using the --prefix flag.
 func MetricsToPaths(metrics []string) []string {
 	p := make([]string, 0)
 	for _, m := range metrics {
@@ -43,6 +55,9 @@ func MetricsToPaths(metrics []string) []string {
 	return p
 }
 
+// PathToMetric takes an absolute path that begins with the --prefix flag
+// and returns the metric name.  The path is path.Clean()'d before
+// transformed.
 func PathToMetric(p string) string {
 	// XXX: What do we do with absolute paths that don't begin with Prefix?
 	p = path.Clean(p)
@@ -57,6 +72,17 @@ func PathToMetric(p string) string {
 	return strings.Replace(p, "/", ".", -1)
 }
 
+// RelativeToMetric takes a relative path from the root of your DB store
+// and translates it into a metric name.  Path is path.Clean()'d before
+// transformed.
+func RelativeToMetric(p string) string {
+	p = path.Clean(p)
+	p = strings.Replace(p, ".wsp", "", 1)
+	return strings.Replace(p, "/", ".", -1)
+}
+
+// PathsToMetrics operates on a slice of absolute paths prefixed with
+// the --prefix flag and returns a slice of metric names.
 func PathsToMetrics(p []string) []string {
 	ret := make([]string, 0)
 	for _, v := range p {

@@ -10,12 +10,13 @@ import (
 	"net/http"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
+
+import "github.com/jjneely/buckytools/metrics"
 
 var metricWorkers int
 var workerErrors bool
@@ -103,32 +104,12 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	return data, nil
 }
 
-func MetricToPath(metric string) string {
-	// assume no prefix
-	path := strings.Replace(metric, ".", "/", -1) + ".wsp"
-	for path[0] == '/' {
-		path = path[1:]
-	}
-
-	return path
-}
-
-func PathToMetric(path string) string {
-	// assume no prefix
-	for path[0] == '/' {
-		path = path[1:]
-	}
-	metric := strings.Replace(path, "/", ".", -1)
-	metric = metric[:len(metric)-4]
-	return metric
-}
-
 func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {
 	tw := tar.NewWriter(os.Stdout)
 	for work := range workOut {
 		log.Printf("Writing %s...", work.Name)
 		th := new(tar.Header)
-		th.Name = MetricToPath(work.Name)
+		th.Name = metrics.MetricToRelative(work.Name)
 		th.Size = work.Size
 		th.Mode = work.Mode
 		th.ModTime = time.Unix(work.ModTime, 0)

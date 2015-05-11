@@ -8,12 +8,15 @@ import (
 	"strings"
 )
 
-import "github.com/jjneely/buckytools"
-import "github.com/jjneely/buckytools/whisper"
+import (
+	"github.com/jjneely/buckytools"
+	"github.com/jjneely/buckytools/metrics"
+	"github.com/jjneely/buckytools/whisper"
+)
 
 // Command Line Flags
 var debug bool
-var prefix string
+var metricName bool
 
 func usage() {
 	fmt.Printf("%s [options]\n", os.Args[0])
@@ -66,7 +69,11 @@ func examine(path string, info os.FileInfo, err error) error {
 		fmt.Printf("%s: %d data points used out of %d in %s\n",
 			path, len(ts), count, flag.Arg(0))
 	} else if len(ts) == 0 {
-		fmt.Println(path)
+		if metricName {
+			fmt.Println(metrics.PathToMetric(path))
+		} else {
+			fmt.Println(path)
+		}
 	}
 
 	return nil
@@ -78,10 +85,8 @@ func main() {
 	flag.BoolVar(&version, "version", false, "Display version information.")
 	flag.BoolVar(&debug, "debug", false, "Verbose output.")
 	flag.BoolVar(&debug, "d", false, "Verbose output.")
-	flag.StringVar(&prefix, "prefix", "/opt/graphite/storage/whisper",
-		"Root of Whisper database store.")
-	flag.StringVar(&prefix, "p", "/opt/graphite/storage/whisper",
-		"Root of Whisper database store.")
+	flag.BoolVar(&metricName, "m", false,
+		"Output metric names rather than paths.")
 	flag.Parse()
 
 	if version {
@@ -89,14 +94,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	prefix, err := filepath.Abs(prefix)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
-	}
-
 	// Start our walk
-	err = filepath.Walk(prefix, examine)
+	err := filepath.Walk(metrics.Prefix, examine)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
