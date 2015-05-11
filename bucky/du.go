@@ -137,7 +137,7 @@ func duMetrics(metricMap map[string][]string) (int, error) {
 			work.name = m
 			workIn <- work
 			c++
-			if c%10 == 0 {
+			if c%100 == 0 {
 				log.Printf("Progress: %d/%d %.2f%%", c, l, float64(c)/float64(l)*100)
 			}
 		}
