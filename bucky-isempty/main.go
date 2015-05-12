@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,10 +22,10 @@ var metricName bool
 func usage() {
 	fmt.Printf("%s [options]\n", os.Args[0])
 	fmt.Printf("Version: %s\n", buckytools.Version)
-	fmt.Printf("\tWalks the PREFIX path searching for files that end in .wsp\n")
-	fmt.Printf("\tand will print the file name or metric key if that Whisper\n")
-	fmt.Printf("\tdatabase contains all null data points (is empty). Errors\n")
-	fmt.Printf("\tgo to STDERR and filename output to STDOUT.\n\n")
+	fmt.Printf("Walks the PREFIX path searching for files that end in .wsp\n")
+	fmt.Printf("and will print the file name or metric key if that Whisper\n")
+	fmt.Printf("database contains all null data points (is empty). Errors\n")
+	fmt.Printf("go to STDERR and filename output to STDOUT.\n\n")
 	flag.PrintDefaults()
 }
 
@@ -97,7 +98,6 @@ func main() {
 	// Start our walk
 	err := filepath.Walk(metrics.Prefix, examine)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
+		log.Fatalf("%s\n", err)
 	}
 }
