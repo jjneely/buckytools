@@ -23,7 +23,7 @@ Moves that result in metrics that live on a different host will be
 completed, so other hosts will be affected even with -s.
 
 Use --no-delete to leave the old metrics in place.  The default is to
-remove metrics from their old location after they have been move and
+remove metrics from their old location after they have been moved and
 backfilled to the new location.
 
 Set -w to change the number of worker threads used to upload the Whisper
@@ -43,11 +43,11 @@ DBs to the remote servers.`
 		"Force the remote daemons to rebuild their cache.")
 }
 
-func rebalanceWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
+func rebalanceWorker(workIn chan *MigrateWork, noDelete bool, wg *sync.WaitGroup) {
 	for work := range workIn {
-		log.Printf("Relocating [%s] %s => [%s] %s",
+		log.Printf("Relocating [%s] %s => [%s] %s  Delete Source: %t",
 			work.oldLocation, work.oldName,
-			work.newLocation, work.newName)
+			work.newLocation, work.newName, !noDelete)
 		metric, err := GetMetricData(work.oldLocation, work.oldName)
 		if err != nil {
 			// errors already handled
@@ -63,9 +63,11 @@ func rebalanceWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
 		}
 
 		// We only delete if there are no errors present
-		err = DeleteMetric(work.oldLocation, work.oldName)
-		if err != nil {
-			workerErrors = true
+		if !noDelete {
+			err = DeleteMetric(work.oldLocation, work.oldName)
+			if err != nil {
+				workerErrors = true
+			}
 		}
 	}
 	wg.Done()
@@ -108,7 +110,7 @@ func RebalanceMetrics(noDelete bool) error {
 	wg := new(sync.WaitGroup)
 	wg.Add(metricWorkers)
 	for i := 0; i < metricWorkers; i++ {
-		go rebalanceWorker(workIn, wg)
+		go rebalanceWorker(workIn, noDelete, wg)
 	}
 
 	// build an order of jobs not dependent on location
