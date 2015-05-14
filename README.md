@@ -31,8 +31,8 @@ stack up you start to find scaling problems:
 * Handling renames and resulting backfills at scale is still
   difficult
 
-So I wanted to use the speed of Go to build more efficient tools to help
-manage large consistent hashing cluster.
+So I wanted to use the speed and concurrency of Go to build more efficient
+tools to help manage large consistent hashing cluster.
 
 Tools
 =====
@@ -49,8 +49,11 @@ These are the tools included and their functionality.
 * **bucky** -- Command line Graphite cluster manager.  Modules:
   * **backfill** -- Backfill old metrics into new names.
   * **delete** -- Delete metrics via list or regular expression.
+  * **du** -- Measure the storage consumed by a list of regular expression of
+    metrics.
   * **inconsistent** -- Find metrics that are stored in the wrong server
     according to the hash ring.
+  * **json** -- Convert newline separated lists to JSON arrays.
   * **list** -- Discover and verify metrics.
   * **locate** -- Calculate metric locations from the hash ring.
   * **rebalance** -- Move inconsistent metrics to the correct location
@@ -71,9 +74,10 @@ These tools assume the following are true:
 
 * You Graphite carbon-cache servers have one Whisper DB store.  Not multiple
   mount points with carbon-cache configured with their own DB store.
-* Your hash ring is set to a REPLICATION_FACTOR of 1
+* Your hash ring is set to a `REPLICATION_FACTOR` of 1
 
-These aren't set in stone, just what I was working with as I built the tool.
+These aren't set in stone, just what I was working with as I built the tool.  I
+very much hope that some of these will be solved with further development.
 
 Daemon Usage
 ============
@@ -133,5 +137,11 @@ To Do / Bugs
 * Authentication -- Negotiate and Kerberos support.  Probably Basic as well.
 * Code clean up -- I wrote a lot of this quickly, it needs love in a
   lot of places.
+* tests
 * Make all modules aware of possible duplicate metrics.
 * Speed testing and improvements.
+* Move the lower level GET, POST, DELETE, HEAD functions into a single
+  common file/place.
+* Retries
+* Rebalance needs to optionally be aware of machines not in the hash ring that
+  the rebalance should vacate.
