@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -57,9 +58,14 @@ DBs to the remote servers.`
 // A post request does a backfill if this metric is already present on disk.
 func PostMetric(server string, metric *MetricData) error {
 	httpClient := GetHTTP()
-	u := fmt.Sprintf("http://%s:%s/metrics/%s", server, GetBuckyPort(), metric.Name)
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/metrics/" + metric.Name,
+	}
+
 	buf := bytes.NewBuffer(metric.Data)
-	r, err := http.NewRequest("POST", u, buf)
+	r, err := http.NewRequest("POST", u.String(), buf)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
 		return err

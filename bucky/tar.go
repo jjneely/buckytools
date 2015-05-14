@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"sync"
@@ -74,8 +75,12 @@ terminal.`
 
 func GetMetricData(server, name string) (*MetricData, error) {
 	httpClient := GetHTTP()
-	u := fmt.Sprintf("http://%s:%s/metrics/%s", server, GetBuckyPort(), name)
-	r, err := http.NewRequest("GET", u, nil)
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/metrics/" + name,
+	}
+	r, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
 		return nil, err
@@ -87,11 +92,15 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("Error: Fetching [%s]:%s returned status code: %d", server, name, resp.StatusCode)
+		return nil, fmt.Errorf("Fetching metric returned status code: %s", resp.Status)
+	}
 
 	data := new(MetricData)
 	err = json.Unmarshal([]byte(resp.Header.Get("X-Metric-Stat")), &data)
 	if err != nil {
-		log.Printf("Error unmarshalling X-Metric-Stat header: %s", err)
+		log.Printf("Error unmarshalling X-Metric-Stat header for [%s]:%s: %s", server, name, err)
 		return nil, err
 	}
 

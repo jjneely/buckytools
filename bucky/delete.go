@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 )
@@ -51,8 +52,13 @@ BUCKYSERVER environment variable.`
 
 func DeleteMetric(server, metric string) error {
 	httpClient := GetHTTP()
-	u := fmt.Sprintf("http://%s:%s/metrics/%s", server, GetBuckyPort(), metric)
-	r, err := http.NewRequest("DELETE", u, nil)
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/metrics/" + metric,
+	}
+
+	r, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
 		return err
