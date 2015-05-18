@@ -186,14 +186,20 @@ func ListAllMetrics(servers []string, force bool) (map[string][]string, error) {
 	requests := make([]*http.Request, 0)
 
 	for _, buckyd := range servers {
-		url := fmt.Sprintf("http://%s/metrics", buckyd)
-		r, err := http.NewRequest("GET", url, nil)
+		u := url.URL{
+			Scheme: "http",
+			Host:   buckyd,
+			Path:   "/metrics",
+		}
+		if force {
+			query := url.Values{}
+			query.Set("force", "true")
+			u.RawQuery = query.Encode()
+		}
+		r, err := http.NewRequest("GET", u.String(), nil)
 		if err != nil {
 			log.Printf("Building request object for %s failed.", buckyd)
 			return nil, err
-		}
-		if force {
-			r.Form.Set("force", "true")
 		}
 		requests = append(requests, r)
 	}
