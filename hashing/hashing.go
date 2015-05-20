@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	//"log"
+	//"os"
 	"strings"
 )
 
@@ -66,12 +67,44 @@ func bisectLeft(ring []RingEntry, e RingEntry) (i int) {
 	return i
 }
 
+// cmp compares two RingEntry variables similar to the way that the Python
+// code in hashing.py compares nodes in the hashring.
+func cmp(a, b RingEntry) int {
+	if a.position < b.position {
+		return -1
+	}
+	if a.position > b.position {
+		return 1
+	}
+
+	// Ok, a.position == b.position
+	if a.node.Server < b.node.Server {
+		return -1
+	}
+	if a.node.Server > b.node.Server {
+		return 1
+	}
+
+	// Now, a.position/server == b.positon/server
+	if a.node.Instance < b.node.Instance {
+		return -1
+	}
+	if a.node.Instance > b.node.Instance {
+		return 1
+	}
+
+	// Out of crazy mess to compare -- must be equal
+	return 0
+}
+
 // bisectRight returns the insertion index where e should be inserted into ring
 // if duplicate e's are already in the list the insertion point will be to the
 // right or after the equal entries.
+// This is only used for ring insertion and the Python version compares tuples
+// so we use a custom cmp function to mimic what the Python code does.
 func bisectRight(ring []RingEntry, e RingEntry) (i int) {
 	for i = 0; i < len(ring); i++ {
-		if ring[i].position > e.position {
+		if cmp(ring[i], e) > 0 {
 			break
 		}
 	}
@@ -135,6 +168,7 @@ func (t *HashRing) SetReplicas(r int) {
 }
 
 func (t *HashRing) AddNode(node Node) {
+	//log.Printf("insertRing(): %s", node.KeyValue())
 	t.nodes = append(t.nodes, node)
 	for i := 0; i < t.replicas; i++ {
 		var e RingEntry
@@ -177,6 +211,11 @@ func (t *HashRing) GetNode(key string) Node {
 	//log.Printf("len(ring) = %d", len(t.ring))
 	//log.Printf("Bisect index for %s is %d", key, i)
 	//log.Printf("Ring position for %s is %x", key, e.position)
+	//fd, _ := os.Create("ring.golang")
+	//for r := range t.ring {
+	//	fd.Write([]byte(fmt.Sprintf("%s:%x\n", t.ring[r].node.KeyValue(), t.ring[r].position)))
+	//}
+	//fd.Close()
 	return t.ring[i].node
 }
 
