@@ -131,6 +131,19 @@ Other common flags are:
 * `-r` Regular expression mode.
 * `-w` Number of worker threads.
 
+Examples
+========
+
+Rebalance a cluster with newly added storage nodes:
+
+    GOMAXPROCS=4 bucky rebalance -h graphite010-g5:4242 \
+        -w 100 2>&1 | tee rebalance.log
+
+Discover the exact storage used by a set of metrics:
+
+    export BUCKYHOST=-h graphite010-g5:4242
+    bucky du -r '^1min\.ipvs\.'
+
 To Do / Bugs
 ============
 
