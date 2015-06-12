@@ -93,7 +93,9 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Printf("Error: Fetching [%s]:%s returned status code: %d", server, name, resp.StatusCode)
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("Error: Fetching [%s]:%s returned status code: %d  Body: %s",
+			server, name, resp.StatusCode, string(body))
 		return nil, fmt.Errorf("Fetching metric returned status code: %s", resp.Status)
 	}
 
