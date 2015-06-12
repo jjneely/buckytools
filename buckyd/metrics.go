@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
+	"time"
 )
 
 import . "github.com/jjneely/buckytools"
@@ -87,7 +89,7 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "HEAD":
-		err := statMetric(w, metric, path)
+		_, err := statMetric(w, metric, path)
 		w.Header().Set("Content-Length", "0")
 		status := http.StatusOK
 		if err != nil {
@@ -98,12 +100,7 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 		// HEAD seems to behave a bit differently, forcing the headers
 		// seems to get the connection closed after the request.
 	case "GET":
-		// statMetric may return an error, which will be handled by
-		// ServeFile() below.  Likely file not found.
-		statMetric(w, metric, path)
-		// XXX: This is a little HTML-specific but I think it
-		// will work
-		http.ServeFile(w, r, path)
+		serveMetric(w, r, path, metric)
 	case "DELETE":
 		// XXX: Auth?  Holodeck safeties are off!
 		deleteMetric(w, path, true)
@@ -123,11 +120,12 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 // statMetric stat()s the given metric file system path and add the
-// X-Metric-Stat header to the response as JSON encoded data
-func statMetric(w http.ResponseWriter, metric, path string) error {
+// X-Metric-Stat header to the response as JSON encoded data.  It returns
+// the modTime on the file and an error code.
+func statMetric(w http.ResponseWriter, metric, path string) (time.Time, error) {
 	s, err := os.Stat(path)
 	if err != nil {
-		return err
+		return s.ModTime(), err
 	}
 
 	stat := new(MetricStatType)
@@ -139,11 +137,11 @@ func statMetric(w http.ResponseWriter, metric, path string) error {
 	// We should be able to marshal this struct without the funcs
 	blob, err := json.Marshal(stat)
 	if err != nil {
-		return err
+		return s.ModTime(), err
 	}
 
 	w.Header().Set("X-Metric-Stat", string(blob))
-	return nil
+	return s.ModTime(), nil
 }
 
 // deleteMetric removes a metric DB from the file system and handles
@@ -237,6 +235,12 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 		defer src.Close()
+		if err = syscall.Flock(int(src.Fd()), syscall.LOCK_EX); err != nil {
+			log.Printf("Error locking file %s: %s", srcName, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		dst, err := os.Create(path)
 		if err != nil {
 			log.Printf("Error opening metric file %s: %s", path, err)
@@ -244,6 +248,12 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 		defer dst.Close()
+		if err = syscall.Flock(int(dst.Fd()), syscall.LOCK_EX); err != nil {
+			log.Printf("Error locking file %s: %s", path, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		_, err = io.Copy(dst, src)
 		if err != nil {
 			log.Printf("Error copying %s => %s: %s", srcName, path, err)
@@ -252,4 +262,33 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		}
 	}
 
+}
+
+// serveMetric will serve a GET request for the metric that path
+// refers to.  Effort is made to serve file data that is pristine and
+// not in the middle of an update by carbon-cache.  The parameter metric is
+// the dotted notation of the metric name.
+func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
+	modTime, err := statMetric(w, metric, path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "Metric not found.", http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	fd, err := os.Open(path)
+	if err != nil {
+		// I know the file exists
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer fd.Close()
+	if err = syscall.Flock(int(fd.Fd()), syscall.LOCK_EX); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.ServeContent(w, r, path, modTime, fd)
 }
