@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -149,6 +150,12 @@ func Create(path string, retentions Retentions, aggregationMethod AggregationMet
 	if err != nil {
 		return nil, err
 	}
+
+	// Lock file as carbon-cache.py would
+	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		file.Close()
+		return nil, err
+	}
 	whisper = new(Whisper)
 
 	// Set the metadata
@@ -225,6 +232,12 @@ func Open(path string) (whisper *Whisper, err error) {
 	if err != nil {
 		return nil, err
 	}
+	// Lock file as carbon-cache.py would
+	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		file.Close()
+		return nil, err
+	}
+
 	whisper = new(Whisper)
 	whisper.file = file
 
@@ -273,6 +286,7 @@ func (whisper *Whisper) writeHeader() (err error) {
   Close the whisper file
 */
 func (whisper *Whisper) Close() {
+	// This releases any held Flock style locks
 	whisper.file.Close()
 }
 
