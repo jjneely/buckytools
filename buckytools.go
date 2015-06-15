@@ -6,7 +6,7 @@ import (
 
 const (
 	// Buckytools suite version
-	Version = "0.0.3"
+	Version = "0.0.4"
 )
 
 // MetricStatType A JSON marshalable FileInfo type

@@ -158,3 +158,4 @@ To Do / Bugs
 * Retries
 * Rebalance needs to optionally be aware of machines not in the hash ring that
   the rebalance should vacate.
+* Graceful restarts and shutdowns?  https://github.com/facebookgo/grace
