@@ -7,8 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"sort"
 	"sync"
@@ -21,16 +19,6 @@ import "github.com/jjneely/buckytools/metrics"
 
 var metricWorkers int
 var workerErrors bool
-
-// MetricData represents an individual metric and its raw data.
-// XXX: Unify this with MetricStatType?
-type MetricData struct {
-	Name    string
-	Size    int64
-	Mode    int64
-	ModTime int64
-	Data    []byte
-}
 
 type MetricWork struct {
 	Name   string
@@ -71,48 +59,6 @@ terminal.`
 		"Downloader threads.")
 	c.Flag.IntVar(&metricWorkers, "workers", 5,
 		"Downloader threads.")
-}
-
-func GetMetricData(server, name string) (*MetricData, error) {
-	httpClient := GetHTTP()
-	u := &url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
-		Path:   "/metrics/" + name,
-	}
-	r, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		log.Printf("Error building request: %s", err)
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(r)
-	if err != nil {
-		log.Printf("Error downloading metric data: %s", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("Error: Fetching [%s]:%s returned status code: %d  Body: %s",
-			server, name, resp.StatusCode, string(body))
-		return nil, fmt.Errorf("Fetching metric returned status code: %s", resp.Status)
-	}
-
-	data := new(MetricData)
-	err = json.Unmarshal([]byte(resp.Header.Get("X-Metric-Stat")), &data)
-	if err != nil {
-		log.Printf("Error unmarshalling X-Metric-Stat header for [%s]:%s: %s", server, name, err)
-		return nil, err
-	}
-
-	data.Data, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response body: %s", err)
-		return nil, err
-	}
-
-	return data, nil
 }
 
 func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {

@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"strings"
 )
@@ -27,49 +27,26 @@ is alive.`
 	SetupJSON(c)
 }
 
-// getSingleHashRing connects to the given host and returns a slice of
-// strings containing the host's configured hashring.  An error value is
-// set if we could not retrieve the hashring information.
-func GetSingleHashRing(hostport string) (*JSONRingType, error) {
-	url := fmt.Sprintf("http://%s/hashring", hostport)
-	server := GetHTTP()
-
-	resp, err := server.Get(url)
+// GetInitialBuckyd returns string representing the host part of the location
+// of the inital buckyd daemon.  This is the host part of HostPort.
+// Validation of the host string should be done here.
+func GetInitialBuckyd() string {
+	host, _, err := net.SplitHostPort(HostPort)
 	if err != nil {
-		log.Printf("Error retrieving URL: %s", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		log.Printf("Abort: /hashring API called returned: %s", resp.Status)
-		return nil, fmt.Errorf("/hashring API called returned: %s", resp.Status)
+		log.Fatalf("Fatal Error: Could not understand host: %s  %s", HostPort, err)
 	}
 
-	ring := new(JSONRingType)
-	blob, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error reading response body: %s", err)
-		return nil, err
-	}
-	err = json.Unmarshal(blob, &ring)
-	if err != nil {
-		log.Printf("Abort: %s", err)
-		return nil, err
-	}
-
-	return ring, nil
+	return host
 }
 
-func fetchRingWorker(host string, c chan *JSONRingType) {
-	hostport := fmt.Sprintf("%s:%s", host, GetBuckyPort())
-	ring, err := GetSingleHashRing(hostport)
+func fetchRingWorker(server string, c chan *JSONRingType) {
+	ring, err := GetSingleHashRing(server)
 	if err == nil {
 		c <- ring
 	} else {
 		// Host in cluster is unhealthy
 		ring = new(JSONRingType)
-		ring.Name = host
+		ring.Name = server
 		ring.Nodes = nil
 		c <- ring
 	}
@@ -78,7 +55,7 @@ func fetchRingWorker(host string, c chan *JSONRingType) {
 // GetClusterRing returns a slice of JSONRingType structs.  One entry for
 // each node in the Graphite cluster.
 func GetClusterRing() ([]*JSONRingType, error) {
-	master, err := GetSingleHashRing(HostPort)
+	master, err := GetSingleHashRing(GetInitialBuckyd())
 	if err != nil {
 		log.Printf("Abort: Cannot communicate with initial buckyd daemon.")
 		return nil, err
@@ -144,7 +121,7 @@ func GetRings() []*JSONRingType {
 	var err error
 
 	if SingleHost {
-		ring, err := GetSingleHashRing(HostPort)
+		ring, err := GetSingleHashRing(GetInitialBuckyd())
 		if err != nil {
 			return nil
 		}

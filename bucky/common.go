@@ -1,15 +1,31 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
-	//"time"
 )
 
-// HttpClient is a cached http.Client. Use GetHTTP() to setup and return.
+import . "github.com/jjneely/buckytools"
+
+// httpClient is a cached http.Client. Use GetHTTP() to setup and return.
 var httpClient *http.Client
+
+// MetricData represents an individual metric and its raw data.
+// XXX: Unify this with MetricStatType?
+type MetricData struct {
+	Name    string
+	Size    int64
+	Mode    int64
+	ModTime int64
+	Data    []byte
+}
 
 // GetHTTP returns a *http.Client that can be used to interact with remote
 // buckyd daemons.
@@ -26,21 +42,208 @@ func GetHTTP() *http.Client {
 	return httpClient
 }
 
+// DeleteMetric sends a DELETE request for the given metric to the given
+// server.  The port is assumed the same for all Bucky daemons in the
+// hash ring.
+func DeleteMetric(server, metric string) error {
+	httpClient := GetHTTP()
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/metrics/" + metric,
+	}
+
+	r, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return err
+	}
+
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error communicating: %s", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case 200:
+		log.Printf("DELETED: %s", metric)
+	case 404:
+		log.Printf("Not found / Not deleted: %s", metric)
+		return fmt.Errorf("Metric not found.")
+	case 500:
+		msg, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			msg = []byte(err.Error())
+		}
+		log.Printf("Error: Internal Server Error: %s", string(msg))
+		return fmt.Errorf("Error: Internal Server Error: %s", string(msg))
+	default:
+		log.Printf("Error: Unknown response from server.  Code %s", resp.Status)
+		return fmt.Errorf("Unknown response from server.  Code %s", resp.Status)
+	}
+
+	return nil
+}
+
+// GetMetricData retrieves the binary Whisper data for a given metric
+// name that lives on the given server.  The port buckyd runs on is
+// assumed to be the same as other servers in the hash ring.
+func GetMetricData(server, name string) (*MetricData, error) {
+	httpClient := GetHTTP()
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/metrics/" + name,
+	}
+	r, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error downloading metric data: %s", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("Error: Fetching [%s]:%s returned status code: %d  Body: %s",
+			server, name, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("Fetching metric returned status code: %s", resp.Status)
+	}
+
+	data := new(MetricData)
+	err = json.Unmarshal([]byte(resp.Header.Get("X-Metric-Stat")), &data)
+	if err != nil {
+		log.Printf("Error unmarshalling X-Metric-Stat header for [%s]:%s: %s", server, name, err)
+		return nil, err
+	}
+
+	data.Data, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading response body: %s", err)
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
+	httpClient := GetHTTP()
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/metrics/" + metric,
+	}
+
+	r, err := http.NewRequest("HEAD", u.String(), nil)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error communicating: %s", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case 200:
+		data := resp.Header.Get("X-Metric-Stat")
+		if data == "" {
+			log.Printf("No stat data returned for: %s", metric)
+			return nil, fmt.Errorf("No stat data returned for: %s", metric)
+		}
+		stat := new(MetricStatType)
+		err := json.Unmarshal([]byte(data), &stat)
+		if err != nil {
+			log.Printf("Error: Could not parse X-Metric-Stat header for %s", metric)
+			return nil, err
+		}
+		return stat, nil
+	case 404:
+		log.Printf("Metric not found: %s", metric)
+		return nil, fmt.Errorf("Metric not found.")
+	case 500:
+		msg, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			msg = []byte(err.Error())
+		}
+		log.Printf("Error: Internal Server Error: %s", string(msg))
+		return nil, fmt.Errorf("Error: Internal Server Error: %s", string(msg))
+	default:
+		log.Printf("Error: Unknown response from server.  Code %s", resp.Status)
+		return nil, fmt.Errorf("Unknown response from server.  Code %s", resp.Status)
+	}
+
+	// shouldn't get here
+	return nil, fmt.Errorf("Unexpected error in StatRemoteMetric()")
+}
+
+// GetSingleHashRing connects to the given server and returns a slice of
+// strings containing the host's configured hashring.  An error value is
+// set if we could not retrieve the hashring information.
+func GetSingleHashRing(server string) (*JSONRingType, error) {
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Path:   "/hashring",
+	}
+	httpClient := GetHTTP()
+
+	r, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return nil, err
+	}
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error retrieving URL: %s", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("Abort: /hashring API called returned: %s", resp.Status)
+		return nil, fmt.Errorf("/hashring API called returned: %s", resp.Status)
+	}
+
+	ring := new(JSONRingType)
+	blob, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading response body: %s", err)
+		return nil, err
+	}
+	err = json.Unmarshal(blob, &ring)
+	if err != nil {
+		log.Printf("Abort: %s", err)
+		return nil, err
+	}
+
+	return ring, nil
+}
+
 // GetBuckyPort returns the port number as a string where the buckyd
 // daemon runs.  Useful for discovering hosts in the hash ring and
 // knowing what port to find buckyd on.  We assume that all hosts in
 // the cluster are configured consistently.
 func GetBuckyPort() string {
-	fields := strings.Split(HostPort, ":")
-	switch len(fields) {
-	case 0:
-	case 1:
-	case 2:
-		return fields[1]
-	default:
-		log.Fatalf("Unable to determine port buckyd runs on.")
+	if !strings.Contains(HostPort, ":") {
+		return "4242"
 	}
-	return "4242"
+
+	_, port, err := net.SplitHostPort(HostPort)
+	if err != nil {
+		log.Fatalf("Fatal Error: Could not understand host: %s  %s", HostPort, err)
+	}
+
+	return port
 }
 
 // HostPort is a convenience variable for sub-commands.  This holds the

@@ -6,13 +6,9 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"sync"
 )
-
-import . "github.com/jjneely/buckytools"
 
 // duTotal is the result of the du operation in bytes.
 var duTotal int
@@ -45,66 +41,13 @@ BUCKYSERVER environment variable.`
 		"Downloader threads.")
 }
 
-func DuMetric(server, metric string) (int, error) {
-	httpClient := GetHTTP()
-	u := &url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
-		Path:   "/metrics/" + metric,
-	}
-
-	r, err := http.NewRequest("HEAD", u.String(), nil)
-	if err != nil {
-		log.Printf("Error building request: %s", err)
-		return 0, err
-	}
-
-	resp, err := httpClient.Do(r)
-	if err != nil {
-		log.Printf("Error communicating: %s", err)
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case 200:
-		data := resp.Header.Get("X-Metric-Stat")
-		if data == "" {
-			log.Printf("No stat data returned for: %s", metric)
-			return 0, fmt.Errorf("No stat data returned for: %s", metric)
-		}
-		stat := new(MetricStatType)
-		err := json.Unmarshal([]byte(data), &stat)
-		if err != nil {
-			log.Printf("Error: Could not parse X-Metric-Stat header for %s", metric)
-			return 0, err
-		}
-		return int(stat.Size), nil
-	case 404:
-		log.Printf("Metric not found: %s", metric)
-		return 0, fmt.Errorf("Metric not found.")
-	case 500:
-		msg, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			msg = []byte(err.Error())
-		}
-		log.Printf("Error: Internal Server Error: %s", string(msg))
-		return 0, fmt.Errorf("Error: Internal Server Error: %s", string(msg))
-	default:
-		log.Printf("Error: Unknown response from server.  Code %s", resp.Status)
-		return 0, fmt.Errorf("Unknown response from server.  Code %s", resp.Status)
-	}
-
-	return 0, nil // shouldn't get here
-}
-
 func duWorker(workIn chan *DeleteWork, workOut chan int, wg *sync.WaitGroup) {
 	for work := range workIn {
-		size, err := DuMetric(work.server, work.name)
+		stat, err := StatRemoteMetric(work.server, work.name)
 		if err != nil {
 			workerErrors = true
 		} else {
-			workOut <- size
+			workOut <- int(stat.Size)
 		}
 	}
 	wg.Done()
