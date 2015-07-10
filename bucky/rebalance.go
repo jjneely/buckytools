@@ -7,24 +7,34 @@ import (
 )
 
 var noDelete bool
+var noOp bool
 
 func init() {
-	usage := "[options]"
+	usage := "[options] [additional buckyd servers...]"
 	short := "Rebalance a server or the entire cluster."
 	long := `Locate metrics on the wrong server and move them.
 
-Rebalance is a non-destructive operation that will locate metrics that
+Rebalance is a non-destructive operation that will find metrics that
 are on the wrong server or that have duplicates and will near-atomically
 move them to the correct server and backfill as needed.
 
-Use -s to operate on out of place metrics found on the initial host given
-by -h or the BUCKYHOST environment variable.  Cluster health is not checked.
-Moves that result in metrics that live on a different host will be
-completed, so other hosts will be affected even with -s.
+You may optionally specify the network locations of other Buckyd daemons
+as arguments to this command.  Metrics found via these daemons will be
+relocated according to the hash ring.  This is useful for moving all
+metrics off of a server when removing it from the cluster.  Metrics will be
+deleted per normal according to the --no-delete flag.
+
+Use -s to operate on metrics found on the initial host given by -h or the
+BUCKYHOST environment variable.  Cluster health is not checked.  Moves that
+result in metrics that live on a different host will be completed, so other
+hosts will be affected even with -s.
 
 Use --no-delete to leave the old metrics in place.  The default is to
 remove metrics from their old location after they have been moved and
 backfilled to the new location.
+
+The --no-op option will not alter any metrics and print a report of what
+would have been done.
 
 Set -w to change the number of worker threads used to upload the Whisper
 DBs to the remote servers.`
@@ -35,6 +45,8 @@ DBs to the remote servers.`
 
 	c.Flag.BoolVar(&noDelete, "no-delete", false,
 		"Do not delete metrics after moving them.")
+	c.Flag.BoolVar(&noOp, "no-op", false,
+		"Do not alter metrics and print report.")
 	c.Flag.IntVar(&metricWorkers, "w", 5,
 		"Downloader threads.")
 	c.Flag.IntVar(&metricWorkers, "workers", 5,
@@ -87,8 +99,13 @@ func countMap(metricsMap map[string][]string) int {
 // It will clean up the old location unless noDelete is true.  The goal
 // is to be near atomic as we can.  Metrics are removed directly after
 // they have been backfilled in place.
-func RebalanceMetrics(noDelete bool) error {
+//
+// Additional host:port strings can be given via extraHostPorts to
+// locate additional Buckyd daemons not in the current hash ring.  This
+// will effectively drain all metrics off of these hosts.
+func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 	hostPorts := GetAllBuckyd()
+	hostPorts = append(hostPorts, extraHostPorts...)
 	if len(hostPorts) == 0 {
 		log.Printf("Cluster is unhealthy or error finding cluster members.")
 		return fmt.Errorf("Cluster is unhealthy.")
@@ -125,7 +142,15 @@ func RebalanceMetrics(noDelete bool) error {
 
 			id := fmt.Sprintf("[%s] %s", server, m)
 			jobs[id] = work
+
+			if noOp {
+				log.Printf("%s => %s", id, work.newLocation)
+			}
 		}
+	}
+
+	if noOp {
+		log.Fatal("Halting.  No-op mode enganged.")
 	}
 
 	// Queue up and process work
@@ -152,7 +177,12 @@ func RebalanceMetrics(noDelete bool) error {
 // rebalanceCommand runs this subcommand.
 func rebalanceCommand(c Command) int {
 	var err error
-	err = RebalanceMetrics(noDelete)
+	var oldBuckyd []string
+
+	for i := 0; i < c.Flag.NArg(); i++ {
+		oldBuckyd = append(oldBuckyd, c.Flag.Arg(i))
+	}
+	err = RebalanceMetrics(noDelete, oldBuckyd)
 
 	if err != nil {
 		return 1
