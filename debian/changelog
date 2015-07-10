@@ -1,3 +1,9 @@
+buckytools (0.0.5) unstable; urgency=medium
+
+  * Version bump for dh-golang packaging
+
+ -- Jack Neely <jjneely@42lines.net>  Mon, 06 Jul 2015 16:18:52 -0400
+
 buckytools (0.0.4) unstable; urgency=medium
 
   * Bugfixes and locking support
