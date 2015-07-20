@@ -159,3 +159,9 @@ To Do / Bugs
 * Rebalance needs to optionally be aware of machines not in the hash ring that
   the rebalance should vacate.
 * Graceful restarts and shutdowns?  https://github.com/facebookgo/grace
+* graphite-project/carbon's master branch contains this change:
+
+    https://github.com/graphite-project/carbon/commit/024f9e67ca47619438951c59154c0dec0b
+
+  This will cause a few metrics to be assigned a different position in the
+  hash ring.  We need to account for this algorithm change somehow.
