@@ -39,6 +39,9 @@ Tools
 
 These are the tools included and their functionality.
 
+* **bucky-pickle-relay** -- A daemon that accepts and decodes Graphite's
+  Pickle protocol and will tcp stream the equivalent plaintext version
+  to a carbon-relay.  Useful with [carbon-c-relay][1].
 * **bucky-fill** -- A `whisper-fill` compatible utility that is nearly
   an order of magnitude faster.
 * **bucky-isempty** -- A utility for discovering WSP databases that
@@ -165,3 +168,5 @@ To Do / Bugs
 
   This will cause a few metrics to be assigned a different position in the
   hash ring.  We need to account for this algorithm change somehow.
+
+[1]: https://github.com/grobian/carbon-c-relay
