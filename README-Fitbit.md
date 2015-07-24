@@ -9,10 +9,8 @@ Upstream: https://github.com/jjneely/buckytools
 Build Instructions
 ==================
 
-Push an annotated tag to trigger the Jenkins build job.  The Graphite cluster
-will pick up the new packages on the next Puppet run.
-
-We build from the master branch.
+    $ make dsc
+    $ pbuilder-dist trusty ../buckytools-*.dsc
 
 Jack Neely
 jjneely@42lines.net
