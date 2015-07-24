@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-import pickle "github.com/kisielk/og-rek"
+import pickle "github.com/jjneely/buckytools/pickle"
 
 // Where we listen for incoming TCP connections
 var bindTo string
