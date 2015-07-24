@@ -13,7 +13,15 @@ Copyright: 2015 42 Lines, Inc.
 License: MIT
 
 Files: whisper/*
-Copyright 2012 Rob Young
+Copyright: 2012 Rob Young
+License: BSD
+
+Files: terminal/*
+Copyright: 2011 The Go Authors.
+License: BSD
+
+Files: pickle/*
+Copyright: 2013 Kamil Kisiel
 License: BSD
 
 License: MIT
