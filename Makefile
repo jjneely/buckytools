@@ -7,7 +7,7 @@
 #
 # Nothing done here, we don't compile in the DSC build process
 
-commands = bucky buckyd bucky-fill bucky-isempty
+commands = bucky buckyd bucky-fill bucky-isempty bucky-pickle-relay
 
 all: build
 
