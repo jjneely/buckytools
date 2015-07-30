@@ -1,3 +1,9 @@
+buckytools (0.1.1) unstable; urgency=medium
+
+  * bucky-pickle-relay: Handle TCP RST packets better
+
+ -- Jack Neely <jjneely@42lines.net>  Thu, 30 Jul 2015 14:43:11 -0400
+
 buckytools (0.1.0) unstable; urgency=medium
 
   * Build of 0.1.0 with bucky-pickle-relay
