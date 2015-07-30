@@ -18,6 +18,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -99,6 +100,11 @@ func handleConn(conn net.Conn) {
 		err := readSlice(conn, sizeBuf)
 		if err == io.EOF {
 			// Remote end closed connection
+			return
+		} else if neterr, ok := err.(*net.OpError); ok && neterr.Err == syscall.ECONNRESET {
+			// Connection reset by peer between Pickles
+			// or TCP probe health check
+			// at this point in the proto we ignore
 			return
 		} else if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 			// Timeout waiting for data on connection
