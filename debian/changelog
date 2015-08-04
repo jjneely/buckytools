@@ -1,3 +1,9 @@
+buckytools (0.1.2) unstable; urgency=medium
+
+  * bucky-pickle-relay: accept float64 timestamps
+
+ -- Jack Neely <jjneely@42lines.net>  Tue, 04 Aug 2015 14:12:30 -0400
+
 buckytools (0.1.1) unstable; urgency=medium
 
   * bucky-pickle-relay: Handle TCP RST packets better
