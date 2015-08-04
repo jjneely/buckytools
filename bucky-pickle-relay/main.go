@@ -156,35 +156,37 @@ func handlePickle(object interface{}) {
 		var key, ts, dp string
 		metric, ok := v.([]interface{})
 		if !ok {
-			log.Printf("[]interface{} not data type inside pickle slice")
+			log.Printf("Dropping metric: []interface{} not data type inside pickle slice")
 			continue
 		}
 
 		key, ok = metric[0].(string)
 		if !ok {
-			log.Printf("Unexpected type where metric key string should be")
+			log.Printf("Dropping metric: Unexpected type where metric key string should be")
 			continue
 		}
 
 		datatuple, ok := metric[1].([]interface{})
 		if !ok {
-			log.Printf("ts, dp []interface{} not found")
+			log.Printf("Dropping metric: ts, dp []interface{} not found")
 			continue
 		}
 
 		switch t := datatuple[0].(type) {
 		default:
-			log.Printf("Unexpected type in pickle data")
+			log.Printf("Dropping metric: Unexpected type %T in timestamp for %s", datatuple[0], key)
 			continue
 		case string:
 			ts = strings.TrimSpace(t)
 		case int64:
 			ts = fmt.Sprintf("%d", t)
+		case float64:
+			ts = fmt.Sprintf("%.12f", t)
 		}
 
 		switch t := datatuple[1].(type) {
 		default:
-			log.Printf("Unexpected type in pickle data")
+			log.Printf("Dropping metric: Unexpected type %T in value for %s", datatuple[1], key)
 			continue
 		case string:
 			dp = strings.TrimSpace(t)
