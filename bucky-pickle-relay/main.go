@@ -108,7 +108,7 @@ func handleConn(conn net.Conn) {
 			return
 		} else if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 			// Timeout waiting for data on connection
-			log.Printf("Timeout waiting for data on connection")
+			log.Printf("Timeout on idle connection from: %s", conn.RemoteAddr())
 			return
 		} else if err != nil {
 			log.Printf("Error reading connection: %s", err)
