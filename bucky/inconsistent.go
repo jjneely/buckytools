@@ -66,6 +66,9 @@ func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 		log.Printf("%d inconsistent metrics found on %s", len(metrics), server)
 		sort.Strings(metrics)
 	}
+	if len(results) == 0 {
+		log.Printf("No inconsistent metrics found.")
+	}
 
 	return results, nil
 }
