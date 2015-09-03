@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -108,7 +109,7 @@ func handleConn(conn net.Conn) {
 			return
 		} else if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 			// Timeout waiting for data on connection
-			log.Printf("Timeout waiting for data on connection")
+			log.Printf("Timeout on idle connection from: %s", conn.RemoteAddr())
 			return
 		} else if err != nil {
 			log.Printf("Error reading connection: %s", err)
@@ -182,6 +183,8 @@ func handlePickle(object interface{}) {
 			ts = fmt.Sprintf("%d", t)
 		case float64:
 			ts = fmt.Sprintf("%.12f", t)
+		case *big.Int:
+			ts = fmt.Sprintf("%d", t)
 		}
 
 		switch t := datatuple[1].(type) {
@@ -194,6 +197,8 @@ func handlePickle(object interface{}) {
 			dp = fmt.Sprintf("%d", t)
 		case float64:
 			dp = fmt.Sprintf("%.12f", t)
+		case *big.Int:
+			dp = fmt.Sprintf("%d", t)
 		}
 
 		metrics = append(metrics, fmt.Sprintf("%s %s %s", key, dp, ts))
