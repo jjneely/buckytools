@@ -1,3 +1,9 @@
+buckytools (0.1.3) unstable; urgency=medium
+
+  * Except *big.Int timestamps/data values types
+
+ -- Jack Neely <jjneely@42lines.net>  Thu, 03 Sep 2015 15:11:23 -0400
+
 buckytools (0.1.2) unstable; urgency=medium
 
   * bucky-pickle-relay: accept float64 timestamps
