@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -182,6 +183,8 @@ func handlePickle(object interface{}) {
 			ts = fmt.Sprintf("%d", t)
 		case float64:
 			ts = fmt.Sprintf("%.12f", t)
+		case *big.Int:
+			ts = fmt.Sprintf("%d", t)
 		}
 
 		switch t := datatuple[1].(type) {
@@ -194,6 +197,8 @@ func handlePickle(object interface{}) {
 			dp = fmt.Sprintf("%d", t)
 		case float64:
 			dp = fmt.Sprintf("%.12f", t)
+		case *big.Int:
+			dp = fmt.Sprintf("%d", t)
 		}
 
 		metrics = append(metrics, fmt.Sprintf("%s %s %s", key, dp, ts))
