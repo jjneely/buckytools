@@ -34,8 +34,16 @@ var carbonRelay string
 // Debug boolean
 var debug bool
 
-// timeout connections after X seconds of blocking / inactivity
-var timeout int
+// sendTimout is the TCP timeout for out going line proto connections.
+// This size is controlled by the -s flag and is how we react to failures
+// of the carbon-relay-like daemon we are sending to.
+var sendTimeout int
+
+// pickleTimeout is the TCP timeout set on incoming pickle proto connections
+// when the connection is first accepted and after every successful pickle
+// object is received.  This disconnects idle open TCP connections from
+// your app(s).  This is set with the -t flag.
+var pickleTimeout int
 
 // maxPickleSize is the largest pickle data stream we will accept
 var maxPickleSize int
@@ -95,7 +103,7 @@ func handleConn(conn net.Conn) {
 	var dataBuf = make([]byte, 0, maxPickleSize)
 
 	for {
-		conn.SetDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
+		conn.SetDeadline(time.Now().Add(time.Second * time.Duration(pickleTimeout)))
 
 		// Pickle is preceded by an unsigned long integer of 4 bytes (!L)
 		err := readSlice(conn, sizeBuf)
@@ -240,11 +248,13 @@ func plainTextOut() {
 			if len(batch) == 0 {
 				batch = plainTextBatch(<-queue, 10)
 			}
-			conn.SetDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
+			conn.SetDeadline(time.Now().Add(time.Second * time.Duration(sendTimeout)))
 			_, err = conn.Write([]byte(batch[0] + "\n"))
 			if err == nil {
 				// on err we want to resend the last packet/batch
 				batch = batch[1:]
+			} else {
+				log.Printf("Error writing to TCP socket, re-sending: %s", err)
 			}
 		}
 
@@ -259,8 +269,10 @@ func main() {
 		"Address to bind to for incoming connections.")
 	flag.BoolVar(&debug, "d", false,
 		"Debug mode.")
-	flag.IntVar(&timeout, "t", 30,
-		"Connection block and idle timeout.")
+	flag.IntVar(&pickleTimeout, "t", 300,
+		"Timeout in seconds on incoming pickle protocol TCP connections.")
+	flag.IntVar(&sendTimeout, "s", 30,
+		"TCP timeout in seconds for outgoing line protocol connections.")
 	flag.IntVar(&maxPickleSize, "x", 1*1024*1024,
 		"Maximum pickle size accepted.")
 	pickleQueueSize := flag.Int("q", 1024,
