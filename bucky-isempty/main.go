@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 import (
@@ -21,12 +22,15 @@ var metricName bool
 var lastDP bool
 
 func usage() {
-	fmt.Printf("%s [options]\n", os.Args[0])
-	fmt.Printf("Version: %s\n", buckytools.Version)
-	fmt.Printf("Walks the PREFIX path searching for files that end in .wsp\n")
-	fmt.Printf("and will print the file name or metric key if that Whisper\n")
-	fmt.Printf("database contains all null data points (is empty). Errors\n")
-	fmt.Printf("go to STDERR and filename output to STDOUT.\n\n")
+	fmt.Printf("%s [options] [.wsp files]\n", os.Args[0])
+	fmt.Printf("Version: %s\n\n", buckytools.Version)
+	fmt.Printf(`Examines the given WSP DB files for valid data points and
+prints the path if no data points are found.  Options allow finding the
+time and value of the most recent data point in the DB file.  If no files
+are given on the command line all WSP found in the file tree rooted at the
+prefix are scanned.  Useful for finding empty WSP files that can be removed.
+All errors and logs are reported to STDERR.`)
+	fmt.Printf("\n\n")
 	flag.PrintDefaults()
 }
 
@@ -69,8 +73,9 @@ func examine(path string, info os.FileInfo, err error) error {
 
 	if lastDP {
 		if len(ts) > 0 {
+			t := time.Unix(int64(ts[0].Time), 0).UTC().Format(time.RFC3339)
 			fmt.Printf("%s: Most recent DP: %s\t%.2f\n",
-				path, ts[0].Time, ts[0].Value)
+				path, t, ts[0].Value)
 		} else {
 			fmt.Printf("%s: No valid data points\n", path)
 		}
