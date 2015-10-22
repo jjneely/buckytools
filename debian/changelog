@@ -1,3 +1,11 @@
+buckytools (0.1.4-1) unstable; urgency=medium
+
+  * Rebuild with Go 1.5.1
+  * Build with autobuilders
+  * Include bucky stat command
+
+ -- Jack Neely <jjneely@42lines.net>  Thu, 22 Oct 2015 15:52:49 -0400
+
 buckytools (0.1.4) unstable; urgency=medium
 
   * bucky-pickle-relay: Improve logging
