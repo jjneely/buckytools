@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,6 +20,13 @@ var listRegexMode bool
 var listForce bool
 var listLocation bool
 
+// metricListRequest defines the parameters for the /metrics API call to a
+// remote bucky daemon.
+type metricListRequest struct {
+	url  url.URL
+	body *string
+}
+
 // RetryReader is a buffer for HTTP request bodies that is replayable.
 // As the request transport will close the body after its sent we
 // hook the close to seek back to the begining of the buffer and
@@ -32,8 +40,8 @@ func (r *RetryReader) Close() error {
 	return nil
 }
 
-func NewRetryReader(s string) *RetryReader {
-	reader := strings.NewReader(s)
+func NewRetryReader(s *string) *RetryReader {
+	reader := strings.NewReader(*s)
 	return &RetryReader{reader}
 }
 
@@ -69,14 +77,13 @@ consistent hash ring.  Combined with -j the JSON output will be a hash.`
 		"List the metric's real relocation.")
 }
 
-// getMetricCache accepts an *http.Request type that defines a request to
-// retrieve metrics from a remote buckyd daemon.  This can be a GET/POST
-// with various query parameters as specified by the REST API notes.  This
-// blocks if the remote daemon is building its metric cache (202 code)
-// and returns a map of slices of strings after a successful 200 and parsing
-// of the JSON data.  Map is server => metrics.
-func getMetricCache(r *http.Request) (map[string][]string, error) {
-	resp, err := HTTPFetch(r)
+// getMetricCache accepts a url.URL and body  that defines a request to
+// retrieve metrics from a remote buckyd daemon.  These are formed into
+// a http.Request object and used to fetch remote metric listings.  This
+// also handles 202 (result not available) return codes and re-issuing the
+// request.  This returns a map of slices of strings keyed by host.
+func getMetricCache(u url.URL, body *string) (map[string][]string, error) {
+	resp, err := HTTPFetch(u, body)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +95,7 @@ func getMetricCache(r *http.Request) (map[string][]string, error) {
 		return nil, err
 	}
 
-	host := strings.Split(r.URL.Host, ":")[0]
+	host := strings.Split(u.Host, ":")[0]
 	metrics := make([]string, 0)
 	blob, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -105,52 +112,73 @@ func getMetricCache(r *http.Request) (map[string][]string, error) {
 	return map[string][]string{host: metrics}, nil
 }
 
-// HTTPFetch attempts to execute an *http.Request with a Fibonacci backoff
-// for handling errors and 202 status codes (results not available)
-func HTTPFetch(r *http.Request) (*http.Response, error) {
-	fib := []time.Duration{0, 1, 1, 2, 3, 5, 8, 13, 21, 34}
-	httpClient = GetHTTP()
-	resp, err := httpClient.Do(r)
-	if err != nil {
-		log.Printf("Error communicating with server: %s", r.URL.Host)
-		log.Printf("%s", err)
-		return nil, err
+// HTTPFetch attempts to build and execute an *http.Request with a Fibonacci
+// backoff for handling errors and 202 status codes (results not available)
+func HTTPFetch(u url.URL, body *string) (*http.Response, error) {
+	fib := []time.Duration{0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55}
+	httpClient := GetHTTP()
+
+	method := "GET"
+	if body != nil {
+		method = "POST"
+	}
+
+	var rc *RetryReader
+	if body != nil {
+		rc = NewRetryReader(body)
 	}
 
 	i := 0
-	for resp.StatusCode == 202 {
+	for {
+		// XXX: How do I do this better?
+		var r *http.Request
+		var err error
+		if body == nil {
+			r, err = http.NewRequest(method, u.String(), nil)
+		} else {
+			r, err = http.NewRequest(method, u.String(), rc)
+		}
+		if method == "POST" {
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+		resp, err := httpClient.Do(r)
+		if err != nil {
+			log.Printf("Error communicating with server: %s", u.Host)
+			log.Printf("%s", err)
+			return nil, err
+		}
+
+		if resp.StatusCode != 202 {
+			// Hey, we're done
+			return resp, nil
+		}
+		resp.Body.Close()
+
 		// Sleep and retry until results are available
-		log.Printf("Results from %s not available. Sleeping.", r.URL.Host)
+		log.Printf("Results from %s not available. Sleeping.", u.Host)
 		if i == len(fib) {
 			time.Sleep(fib[i-1] * time.Second)
 		} else {
 			time.Sleep(fib[i] * time.Second)
 			i++
 		}
-
-		resp.Body.Close()
-		resp, err = httpClient.Do(r)
-		if err != nil {
-			log.Printf("Error communicating: %s", err)
-			return nil, err
-		}
 	}
 
-	return resp, err
+	return nil, errors.New("Code Error: Shouldn't have gotten here")
 }
 
 // multiplexListRequests issues the given slice of Requests in parallel
 // and merges the results.  The error will indicate an error with
 // one or more http request/response that has already been handled.
-func multiplexListRequests(r []*http.Request) (map[string][]string, error) {
+func multiplexListRequests(r []metricListRequest) (map[string][]string, error) {
 	var wg sync.WaitGroup
 	comms := make(chan map[string][]string, 10)
 	wg.Add(len(r))
 	errors := false
 
 	for _, v := range r {
-		go func(req *http.Request) {
-			metrics, err := getMetricCache(req)
+		go func(req metricListRequest) {
+			metrics, err := getMetricCache(req.url, req.body)
 			if err == nil {
 				// Errors reported by getMetricsCache
 				comms <- metrics
@@ -183,7 +211,7 @@ func multiplexListRequests(r []*http.Request) (map[string][]string, error) {
 // contact those buckyd daemons, gets the list of all known metrics on that
 // server, returns a map of server => list of metrics
 func ListAllMetrics(servers []string, force bool) (map[string][]string, error) {
-	requests := make([]*http.Request, 0)
+	requests := make([]metricListRequest, 0)
 
 	for _, buckyd := range servers {
 		u := url.URL{
@@ -196,12 +224,7 @@ func ListAllMetrics(servers []string, force bool) (map[string][]string, error) {
 			query.Set("force", "true")
 			u.RawQuery = query.Encode()
 		}
-		r, err := http.NewRequest("GET", u.String(), nil)
-		if err != nil {
-			log.Printf("Building request object for %s failed.", buckyd)
-			return nil, err
-		}
-		requests = append(requests, r)
+		requests = append(requests, metricListRequest{u, nil})
 	}
 
 	return multiplexListRequests(requests)
@@ -211,22 +234,21 @@ func ListAllMetrics(servers []string, force bool) (map[string][]string, error) {
 // metrics matching the given regex.  If successful matching metrics from
 // all servers returned in a map of server => slice of metrics
 func ListRegexMetrics(servers []string, regex string, force bool) (map[string][]string, error) {
-	requests := make([]*http.Request, 0)
+	requests := make([]metricListRequest, 0)
 
 	for _, buckyd := range servers {
-		u := fmt.Sprintf("http://%s/metrics", buckyd)
-		form := url.Values{}
+		u := url.URL{
+			Scheme: "http",
+			Host:   buckyd,
+			Path:   "/metrics",
+		}
+		query := url.Values{}
 		if force {
-			form.Set("force", "true")
+			query.Set("force", "true")
 		}
-		form.Set("regex", regex)
-		r, err := http.NewRequest("GET", u, nil)
-		r.URL.RawQuery = form.Encode()
-		if err != nil {
-			log.Printf("Building request object for %s failed.", buckyd)
-			return nil, err
-		}
-		requests = append(requests, r)
+		query.Set("regex", regex)
+		u.RawQuery = query.Encode()
+		requests = append(requests, metricListRequest{u, nil})
 	}
 
 	return multiplexListRequests(requests)
@@ -237,27 +259,26 @@ func ListRegexMetrics(servers []string, regex string, force bool) (map[string][]
 // metrics.  Results from all servers are returned in a map of server =>
 // slice of metrics.
 func ListSliceMetrics(servers []string, metrics []string, force bool) (map[string][]string, error) {
-	requests := make([]*http.Request, 0)
+	requests := make([]metricListRequest, 0)
 
 	for _, buckyd := range servers {
-		u := fmt.Sprintf("http://%s/metrics", buckyd)
-		data := url.Values{}
+		u := url.URL{
+			Scheme: "http",
+			Host:   buckyd,
+			Path:   "/metrics",
+		}
+		query := url.Values{}
 		if force {
-			data.Set("force", "true")
+			query.Set("force", "true")
 		}
 		blob, err := json.Marshal(metrics)
 		if err != nil {
 			log.Printf("Error marshalling JSON data: %s", err)
 			return nil, err
 		}
-		data.Set("list", string(blob))
-		r, err := http.NewRequest("POST", u, NewRetryReader(data.Encode()))
-		if err != nil {
-			log.Printf("Building request object for %s failed.", buckyd)
-			return nil, err
-		}
-		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		requests = append(requests, r)
+		query.Set("list", string(blob))
+		rawQuery := query.Encode()
+		requests = append(requests, metricListRequest{u, &rawQuery})
 	}
 
 	return multiplexListRequests(requests)
