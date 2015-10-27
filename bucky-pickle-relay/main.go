@@ -4,7 +4,9 @@
 // I've used carbon-c-relay for routing and hashing but most of the
 // incoming data is encoded in the pickle format.
 //
-// Jack Neely <jjneely@42lines.net>
+// Copyright 2015 42 Lines, Inc.
+// Original Author: Jack Neely <jjneely@42lines.net>
+//
 // 7/23/2015
 package main
 
@@ -48,8 +50,9 @@ var pickleTimeout int
 // maxPickleSize is the largest pickle data stream we will accept
 var maxPickleSize int
 
-// queue for decoded metrics read to send
-var queue chan []string
+// pickleQueueSize is the buffer size used for the channels interconnecting
+// the stages of execution.  There are two such channels.
+var pickleQueueSize int
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s [options] upstream-relay:port\n\n", os.Args[0])
@@ -59,25 +62,34 @@ func usage() {
 	os.Exit(1)
 }
 
-func serveForever() {
+func serveForever() <-chan []byte {
 	log.Printf("Starting bucky-pickle-relay on %s", bindTo)
 	ln, err := net.Listen("tcp", bindTo)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ln.Close()
 
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Printf("Error accepting connection: %s", err)
-			// Yield execution, we can't accept new connections anyway
-			time.Sleep(time.Second)
-			continue
+	c := make(chan []byte, pickleQueueSize)
+
+	go func() {
+		defer ln.Close()
+		// XXX: Handle singles / timers
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				log.Printf("Error accepting connection: %s", err)
+				// Yield execution, we can't accept new connections anyway
+				time.Sleep(time.Second)
+				continue
+			}
+
+			go handleConn(c, conn)
 		}
 
-		go handleConn(conn)
-	}
+		close(c)
+	}()
+
+	return c
 }
 
 func readSlice(conn net.Conn, buf []byte) error {
@@ -92,7 +104,7 @@ func readSlice(conn net.Conn, buf []byte) error {
 	return nil
 }
 
-func handleConn(conn net.Conn) {
+func handleConn(c chan []byte, conn net.Conn) {
 	if debug {
 		log.Printf("Connection from %s", conn.RemoteAddr().String())
 	}
@@ -100,7 +112,6 @@ func handleConn(conn net.Conn) {
 
 	var size int
 	var sizeBuf = make([]byte, 4)
-	var dataBuf = make([]byte, 0, maxPickleSize)
 
 	for {
 		conn.SetDeadline(time.Now().Add(time.Second * time.Duration(pickleTimeout)))
@@ -120,64 +131,84 @@ func handleConn(conn net.Conn) {
 			log.Printf("Timeout on idle connection from: %s", conn.RemoteAddr())
 			return
 		} else if err != nil {
-			log.Printf("Error reading connection: %s", err)
+			log.Printf("Error reading connection from %s: %s",
+				conn.RemoteAddr(), err)
 			return
 		}
 		size = int(binary.BigEndian.Uint32(sizeBuf))
 
 		if size > maxPickleSize {
 			log.Printf("%s attempting to send %d bytes and is too large, aborting",
-				conn.RemoteAddr().String(), size)
+				conn.RemoteAddr(), size)
 			return
 		}
 
-		// Adjust size of dataBuf slice to not read in extra data
-		dataBuf = dataBuf[0:size]
+		// Allocate a buffer to read in the pickle data
+		dataBuf := make([]byte, size)
 		// Now read the pickle data
 		err = readSlice(conn, dataBuf)
 		if err != nil {
-			log.Printf("Error reading pickle: %s", err)
+			log.Printf("Error reading pickle from %s: %s",
+				conn.RemoteAddr(), err)
 			return
 		}
 
-		decoder := pickle.NewDecoder(bytes.NewBuffer(dataBuf))
-		object, err := decoder.Decode()
-		if err != nil {
-			log.Printf("Error decoding pickle: %s", err)
-		}
-
-		// This can block under load, we've got the goods so lets continue
-		// the dialog with the client who should close the connection
-		go handlePickle(object)
+		c <- dataBuf
 	}
 }
 
-func handlePickle(object interface{}) {
+func handlePickles(pickles <-chan []byte) <-chan []string {
+	metrics := make(chan []string, pickleQueueSize)
+
+	go func() {
+		for p := range pickles {
+			slice := decodePickle(p)
+			if slice != nil && len(slice) > 0 {
+				metrics <- slice
+			}
+			// else clause here would reproduce errors handled/reported
+			// by decodePickle()
+		}
+		close(metrics)
+	}()
+
+	return metrics
+}
+
+func decodePickle(buff []byte) []string {
 	metrics := make([]string, 0)
+
+	decoder := pickle.NewDecoder(bytes.NewBuffer(buff))
+	object, err := decoder.Decode()
+	if err != nil {
+		log.Printf("Error decoding pickle: %s", err)
+		return nil
+	}
+
 	// Is this a slice -- it should be
 	slice, ok := object.([]interface{})
 	if !ok {
-		log.Printf("Pickle object should be []interface{} and is not")
-		return
+		log.Printf("Dropping pickle object: Should be []interface{} and is %T", object)
+		return nil
 	}
 
 	for _, v := range slice {
 		var key, ts, dp string
 		metric, ok := v.([]interface{})
 		if !ok {
-			log.Printf("Dropping metric: []interface{} not data type inside pickle slice")
+			log.Printf("Dropping metric: []interface{} not data type inside pickle slice, rather %T", v)
 			continue
 		}
 
 		key, ok = metric[0].(string)
 		if !ok {
-			log.Printf("Dropping metric: Unexpected type where metric key string should be")
+			log.Printf("Dropping metric: Unexpected %T type where metric key string should be", metric[0])
 			continue
 		}
 
 		datatuple, ok := metric[1].([]interface{})
 		if !ok {
-			log.Printf("Dropping metric: ts, dp []interface{} not found")
+			log.Printf("Dropping metric: ts, dp []interface{} not found, rather %T", metric[1])
 			continue
 		}
 
@@ -212,7 +243,7 @@ func handlePickle(object interface{}) {
 		metrics = append(metrics, fmt.Sprintf("%s %s %s", key, dp, ts))
 	}
 
-	queue <- metrics
+	return metrics
 }
 
 // plainTextBatch take a slice of individual plaintext metric strings
@@ -231,36 +262,44 @@ func plainTextBatch(metrics []string, size int) []string {
 	return ret
 }
 
-func plainTextOut() {
-	var batch []string
-
-	// We attempt to connect forever
+func getRelayConnection() net.Conn {
+	// Block until we have a connection
 	for {
 		conn, err := net.Dial("tcp", carbonRelay)
 		if err != nil {
 			log.Printf("Error connecting to upstream %s: %s", carbonRelay, err)
 			time.Sleep(time.Second)
-			continue
+		} else {
+			return conn
 		}
+	}
+}
 
-		for err == nil {
-			// grab a pickle off the queue if we aren't re-sending
-			if len(batch) == 0 {
-				batch = plainTextBatch(<-queue, 10)
-			}
-			conn.SetDeadline(time.Now().Add(time.Second * time.Duration(sendTimeout)))
-			_, err = conn.Write([]byte(batch[0] + "\n"))
+func plainTextOut(metrics <-chan []string) {
+	var batch []string
+	conn := getRelayConnection()
+
+	for slice := range metrics {
+		// Batching
+		batch = plainTextBatch(slice, 100)
+		for len(batch) != 0 {
+			// XXX: Extending the timeout is fairly expensive, using the assumption
+			// we are talking to localhost we should probably put this in the
+			// outer for loop...or do we really need it at all?
+			// conn.SetDeadline(time.Now().Add(time.Second * time.Duration(sendTimeout)))
+			_, err := conn.Write([]byte(batch[0] + "\n"))
+			// XXX: Do we need to check for short writes?
+
 			if err == nil {
-				// on err we want to resend the last packet/batch
+				// On success we get the next batch
 				batch = batch[1:]
 			} else {
-				log.Printf("Error writing to TCP socket, re-sending: %s", err)
+				// next write will write the current batch again
+				log.Printf("Error writing to TCP socket, re-connecting: %s", err)
+				conn.Close()
+				conn = getRelayConnection()
 			}
 		}
-
-		log.Printf("Reconnecting to %s on error: %s", carbonRelay, err)
-		conn.Close()
-		time.Sleep(time.Second)
 	}
 }
 
@@ -275,8 +314,8 @@ func main() {
 		"TCP timeout in seconds for outgoing line protocol connections.")
 	flag.IntVar(&maxPickleSize, "x", 1*1024*1024,
 		"Maximum pickle size accepted.")
-	pickleQueueSize := flag.Int("q", 1024,
-		"Queue size for processed pickles ready to be sent.")
+	flag.IntVar(&pickleQueueSize, "q", 1024,
+		"Internal buffer sizes.")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		usage()
@@ -284,7 +323,8 @@ func main() {
 
 	log.Printf("bucky-pickle-relay Copyright 2015 42 Lines, Inc.")
 	carbonRelay = flag.Arg(0)
-	queue = make(chan []string, *pickleQueueSize)
-	go plainTextOut()
-	serveForever()
+
+	pickles := serveForever()
+	metrics := handlePickles(pickles)
+	plainTextOut(metrics)
 }
