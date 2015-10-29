@@ -1,3 +1,11 @@
+buckytools (0.1.6-1) unstable; urgency=medium
+
+  * bucky-pickle-relay logging fixes
+  * bucky-pickle-relay decodes pickles in the connection handler rather than
+    a dedicated goroutine.
+
+ -- Jack Neely <jjneely@42lines.net>  Thu, 29 Oct 2015 15:26:41 -0400
+
 buckytools (0.1.5-1) unstable; urgency=medium
 
   * Refactor bucky-pickle-relay to be more idiomatic Go and perform

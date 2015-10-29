@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -52,7 +51,7 @@ var pickleTimeout int
 var maxPickleSize int
 
 // pickleQueueSize is the buffer size used for the channels interconnecting
-// the stages of execution.  There are two such channels.
+// the stages of execution.
 var pickleQueueSize int
 
 // prefix is the string prepended to internally generated metrics to control
@@ -76,7 +75,7 @@ func usage() {
 	os.Exit(1)
 }
 
-func serveForever() <-chan []byte {
+func serveForever() chan []string {
 	log.Printf("Starting bucky-pickle-relay on %s", bindTo)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", bindTo)
 	if err != nil {
@@ -93,7 +92,7 @@ func serveForever() <-chan []byte {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 
-	c := make(chan []byte, pickleQueueSize)
+	c := make(chan []string, pickleQueueSize)
 
 	go func() {
 		defer close(c)
@@ -131,7 +130,7 @@ func serveForever() <-chan []byte {
 
 // reportMetrics adds internal metrics to the data stream, by adding a magic
 // number to the byte slice that we look for to distinguish pickles.
-func reportMetrics(c chan []byte) {
+func reportMetrics(c chan []string) {
 	timestamp := time.Now().Unix()
 	format := "%s%s %d %d"
 	m := make([]string, 3)
@@ -140,7 +139,7 @@ func reportMetrics(c chan []byte) {
 	m[1] = fmt.Sprintf(format, prefix, ".seenMetrics", seenMetrics, timestamp)
 	m[2] = fmt.Sprintf(format, prefix, ".sentMetrics", sentMetrics, timestamp)
 
-	c <- []byte("S" + strings.Join(m, "\n"))
+	c <- m
 }
 
 func readSlice(conn net.Conn, buf []byte) error {
@@ -155,7 +154,7 @@ func readSlice(conn net.Conn, buf []byte) error {
 	return nil
 }
 
-func handleConn(c chan []byte, conn net.Conn) {
+func handleConn(c chan []string, conn net.Conn) {
 	if debug {
 		log.Printf("Connection from %s", conn.RemoteAddr().String())
 	}
@@ -172,7 +171,8 @@ func handleConn(c chan []byte, conn net.Conn) {
 		if err == io.EOF {
 			// Remote end closed connection
 			return
-		} else if neterr, ok := err.(*net.OpError); ok && neterr.Err == syscall.ECONNRESET {
+		} else if neterr, ok := err.(*net.OpError); ok && strings.Contains(neterr.Error(), "connection reset by peer") {
+			// XXX: This used to work in Go 1.4 neterr.Err == syscall.ECONNRESET
 			// Connection reset by peer between Pickles
 			// or TCP probe health check
 			// at this point in the proto we ignore
@@ -205,37 +205,15 @@ func handleConn(c chan []byte, conn net.Conn) {
 		}
 
 		seenPickles++
-		c <- dataBuf
-	}
-}
-
-func handlePickles(pickles <-chan []byte) <-chan []string {
-	metrics := make(chan []string, pickleQueueSize)
-
-	go func() {
-		for p := range pickles {
-			slice := decodePickle(p)
-			if slice != nil && len(slice) > 0 {
-				metrics <- slice
-			}
-			// else clause here would reproduce errors handled/reported
-			// by decodePickle()
+		metrics := decodePickle(dataBuf)
+		if metrics != nil && len(metrics) > 0 {
+			c <- metrics
 		}
-		close(metrics)
-	}()
-
-	return metrics
+	}
 }
 
 func decodePickle(buff []byte) []string {
 	metrics := make([]string, 0)
-
-	if buff[0] == 'S' {
-		// Internal metrics.  Pickles have a magic value of 0x80
-		metrics = strings.Split(string(buff[1:]), "\n")
-		seenMetrics = seenMetrics + len(metrics)
-		return metrics
-	}
 
 	decoder := pickle.NewDecoder(bytes.NewBuffer(buff))
 	object, err := decoder.Decode()
@@ -409,7 +387,6 @@ func main() {
 	log.Printf("Sending line protocol data to %s", carbonRelay)
 	log.Printf("Reporting internal metrics under %s", prefix)
 
-	pickles := serveForever()
-	metrics := handlePickles(pickles)
+	metrics := serveForever()
 	plainTextOut(metrics)
 }
