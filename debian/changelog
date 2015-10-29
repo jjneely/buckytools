@@ -1,3 +1,13 @@
+buckytools (0.1.5-1) unstable; urgency=medium
+
+  * Refactor bucky-pickle-relay to be more idiomatic Go and perform
+    better.
+  * Add signal handling and instrumentation to bucky-pickle-relay
+  * Do not re-use http.Request objects in the bucky client
+  * Certify Go 1.5 safe
+
+ -- Jack Neely <jjneely@42lines.net>  Wed, 28 Oct 2015 16:14:08 -0400
+
 buckytools (0.1.4-1) unstable; urgency=medium
 
   * Rebuild with Go 1.5.1
