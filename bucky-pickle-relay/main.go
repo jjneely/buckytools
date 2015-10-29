@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -172,7 +171,8 @@ func handleConn(c chan []byte, conn net.Conn) {
 		if err == io.EOF {
 			// Remote end closed connection
 			return
-		} else if neterr, ok := err.(*net.OpError); ok && neterr.Err == syscall.ECONNRESET {
+		} else if neterr, ok := err.(*net.OpError); ok && strings.Contains(neterr.Error(), "connection reset by peer") {
+			// XXX: This used to work in Go 1.4 neterr.Err == syscall.ECONNRESET
 			// Connection reset by peer between Pickles
 			// or TCP probe health check
 			// at this point in the proto we ignore
