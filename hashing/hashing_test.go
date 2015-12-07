@@ -1,7 +1,9 @@
 package hashing
 
-import "testing"
-import "fmt"
+import (
+	"fmt"
+	"testing"
+)
 
 func makeRing() *HashRing {
 	hr := NewHashRing()

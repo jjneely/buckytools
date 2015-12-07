@@ -242,6 +242,29 @@ func (t *HashRing) GetNodes(key string) []Node {
 	return result
 }
 
+func (t *HashRing) BucketsPerNode() map[string]int {
+	if len(t.ring) == 0 {
+		panic("HashRing is empty")
+	}
+
+	hash := make(map[string]int)
+	max := 0xFFFF
+	last := t.ring[len(t.ring)-1]
+	for i, e := range t.ring {
+		buckets := 0
+		if i == 0 {
+			buckets = (max - last.position) + e.position
+		} else {
+			buckets = e.position - last.position
+		}
+
+		hash[e.node.String()] = hash[e.node.String()] + buckets
+		last = e
+	}
+
+	return hash
+}
+
 // mod returns a modulo b which is not the same as Go's a % b operator.
 func mod(a, b int) int {
 	return a - (b * (a / b))
