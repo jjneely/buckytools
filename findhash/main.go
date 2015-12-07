@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"sort"
 	"strings"
 )
@@ -31,16 +32,66 @@ func getConfig(file string) []string {
 	return ret
 }
 
+func printKeyAnalysis(hr *hashing.HashRing, file string) {
+	keys := make(map[string]int)
+	total := 0
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Fatalf("Error: %s", err)
+	}
+
+	for _, l := range strings.Split(string(data), "\n") {
+		l = strings.TrimSpace(l)
+		n := hr.GetNode(l)
+		server := fmt.Sprintf("%s:%s", n.Server, n.Instance)
+		keys[server] = keys[server] + 1
+		total++
+	}
+
+	sortedKeys := make([]string, 0)
+	for k := range keys {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+	fmt.Printf("Keys per node:\n")
+	average := float64(total) / float64(hr.Len())
+	variance := float64(0)
+	for _, k := range sortedKeys {
+		fmt.Printf("%s\t%d\n", k, keys[k])
+		variance = variance + math.Pow(float64(keys[k])-average, 2)
+	}
+	fmt.Printf("\nTotal Metric Keys: %d\n", total)
+	fmt.Printf("Ideal keys per node: %.2f\n", average)
+	fmt.Printf("Deviation: %.4f\n", math.Sqrt(variance/float64(len(keys))))
+}
+
 func printAnalysis(hr *hashing.HashRing) {
 	hash := hr.BucketsPerNode()
 	keys := make([]string, 0)
+	min := 0xFFFF
+	max := 0
+	v := float64(0)
+	average := float64(0xFFFF) / float64(hr.Len())
+
 	for k := range hash {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
 		fmt.Printf("Node %s:\t%d\n", k, hash[k])
+		if hash[k] > max {
+			max = hash[k]
+		}
+		if hash[k] < min {
+			min = hash[k]
+		}
+		v = v + math.Pow(float64(hash[k])-average, 2)
 	}
+
+	v = v / float64(hr.Len())
+	fmt.Printf("\nIdeal bucket count per server: %.2f\n", average)
+	fmt.Printf("Spread: %d - %d = %d\n", max, min, max-min)
+	fmt.Printf("Deviation: %.4f\n", math.Sqrt(v))
 }
 
 func makeRing(config []string) *hashing.HashRing {
@@ -87,6 +138,8 @@ func main() {
 		"Show results of hosts matching this prefix")
 	analyze := flag.Bool("analyze", false,
 		"Print Hashring analysis of given configuration")
+	keys := flag.String("keys", "",
+		"Print analysis of key distribution using keys from the newline delimited file")
 	flag.Parse()
 
 	if flag.NArg() != 1 {
@@ -94,10 +147,12 @@ func main() {
 	}
 
 	config := getConfig(flag.Arg(0))
-	average := float64(0xFFFF) / float64(len(config))
-	fmt.Printf("Ideal bucket count per server: %.2f\n", average)
 	if *analyze {
-		printAnalysis(makeRing(config))
+		hr := makeRing(config)
+		printAnalysis(hr)
+		if *keys != "" {
+			printKeyAnalysis(hr, *keys)
+		}
 		return
 	}
 

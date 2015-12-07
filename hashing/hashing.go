@@ -265,6 +265,11 @@ func (t *HashRing) BucketsPerNode() map[string]int {
 	return hash
 }
 
+// Len return the number of buckets or nodes in the hash ring.
+func (t *HashRing) Len() int {
+	return len(t.nodes)
+}
+
 // mod returns a modulo b which is not the same as Go's a % b operator.
 func mod(a, b int) int {
 	return a - (b * (a / b))
