@@ -76,6 +76,11 @@ func (chr *JumpHashRing) Len() int {
 	return len(chr.ring)
 }
 
+// Nodes returns the Nodes in the hashring
+func (chr *JumpHashRing) Nodes() []Node {
+	return chr.ring
+}
+
 // AddNode adds a Node to the Jump Hash Ring.  Jump only operates on the
 // number of buckets so we assume that AddNode will not be used to attempt
 // to insert a Node in the middle of the ring as that will affect the mapping

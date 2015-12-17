@@ -186,8 +186,8 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 	return nil, fmt.Errorf("Unexpected error in StatRemoteMetric()")
 }
 
-// GetSingleHashRing connects to the given server and returns a slice of
-// strings containing the host's configured hashring.  An error value is
+// GetSingleHashRing connects to the given server and returns a JSONRingType
+// representing its hashring configuration.  An error value is
 // set if we could not retrieve the hashring information.
 func GetSingleHashRing(server string) (*JSONRingType, error) {
 	u := &url.URL{
@@ -222,7 +222,7 @@ func GetSingleHashRing(server string) (*JSONRingType, error) {
 	}
 	err = json.Unmarshal(blob, &ring)
 	if err != nil {
-		log.Printf("Abort: %s", err)
+		log.Printf("Could not unmarshal JSON from host %s: %s", server, err)
 		return nil, err
 	}
 
@@ -292,7 +292,7 @@ func SetupJSON(c Command) {
 		"Instead of text ouput JSON encoded data.")
 }
 
-// CleanMetric sanitizes the givem metric key by removing adjacent "."
+// CleanMetric sanitizes the given metric key by removing adjacent "."
 // characters and replacing any "/" characters with "."
 func CleanMetric(m string) string {
 	// Slash isn't really illegal but gets interperated as a directory

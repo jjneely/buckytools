@@ -93,14 +93,18 @@ func GetClusterRing() ([]*JSONRingType, error) {
 // IsHealthy will return true if the cluster ring data from GetClusterRing()
 // represents a healthy and consistent cluster
 func IsHealthy(ring []*JSONRingType) bool {
+	// XXX: If we build SHA sums we can just compare them to do this
 	// We compare each ring to the first one, checking for nil rings
 	for i, v := range ring {
 		if v.Nodes == nil {
 			return false
 		}
 		// Order, host:instance pair, must be the same.  You configured
-		// your cluster with a CM tool, right?
+		// your cluster with a CM tool, right?  Order affects hash rings!
 		if i > 0 {
+			if v.Algo != ring[0].Algo {
+				return false
+			}
 			if len(v.Nodes) != len(ring[0].Nodes) {
 				return false
 			}

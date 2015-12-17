@@ -8,24 +8,60 @@ import (
 	"strings"
 )
 
+// HashRing is an interface that allows us to plug in multiple hash ring
+// implementations.
+type HashRing interface {
+
+	// Len returns the number of Nodes or servers in the hash ring.
+	Len() int
+
+	// GetNode returns a Node after using the hashing algorithm on the
+	// provided key.
+	GetNode(key string) Node
+
+	// GetNodes is similar to GetNode but returns a slice of Nodes who's
+	// length is the smaller of the number of nodes in the ring or
+	// the replication factor.
+	GetNodes(key string) []Node
+
+	// AddNode adds a new Node to the hash ring.  This should not be used
+	// after you have begun calling GetNode or GetNodes.
+	AddNode(node Node)
+
+	// Replicas returns the number of replicas the hash ring is configured
+	// for.  This is the number of shards that each key should be stored
+	// on.
+	Replicas() int
+
+	// Nodes returns a slice of Node detailing all the servers in the hash
+	// ring.
+	Nodes() []Node
+}
+
+// Node is a server and instance value used in the hash ring.  A key is
+// mapped to one or more of the configured Node structs in the hash ring.
 type Node struct {
 	Server   string
 	Instance string
 }
 
+// RingEntry is used to record the position of Nodes in the ring.  Not used
+// in all implementations.
 type RingEntry struct {
 	position int
 	node     Node
 }
 
-type HashRing struct {
+// CarbonHashRing represents Graphite's carbon-cache.py hashing algorithm.
+type CarbonHashRing struct {
 	ring     []RingEntry
 	nodes    []Node
 	replicas int
 }
 
-func NewHashRing() *HashRing {
-	var chr = new(HashRing)
+// NewCarbonHashRing sets up a new CarbonHashRing and returns it.
+func NewCarbonHashRing() *CarbonHashRing {
+	var chr = new(CarbonHashRing)
 	chr.ring = make([]RingEntry, 0, 10)
 	chr.nodes = make([]Node, 0, 10)
 	chr.replicas = 100
@@ -33,7 +69,7 @@ func NewHashRing() *HashRing {
 	return chr
 }
 
-// NewNode returns a node object setup with the given string string and
+// NewNode returns a node object setup with the given server string and
 // instance string.  None or empty instances should be represented by ""
 func NewNode(server, instance string) (n Node) {
 	n.Server = server
@@ -133,7 +169,8 @@ func insertRing(ring []RingEntry, e RingEntry) []RingEntry {
 }
 
 // Node.KeyValue generates the string representation used in the hash
-// ring just as Graphite's Python code does
+// ring just as Graphite's Python code does.  Useful only for carbon
+// style hashrings.
 func (t Node) KeyValue() string {
 	if t.Instance == "" {
 		return fmt.Sprintf("('%s', None)", t.Server)
@@ -149,7 +186,7 @@ func (t Node) String() string {
 	return fmt.Sprintf("%s:%s", t.Server, t.Instance)
 }
 
-func (t *HashRing) String() string {
+func (t *CarbonHashRing) String() string {
 	servers := make([]string, 0)
 
 	for i := 0; i < len(t.nodes); i++ {
@@ -159,15 +196,15 @@ func (t *HashRing) String() string {
 		len(t.nodes), t.replicas, len(t.ring), strings.Join(servers, " "))
 }
 
-func (t *HashRing) Replicas() int {
+func (t *CarbonHashRing) Replicas() int {
 	return t.replicas
 }
 
-func (t *HashRing) SetReplicas(r int) {
+func (t *CarbonHashRing) SetReplicas(r int) {
 	t.replicas = r
 }
 
-func (t *HashRing) AddNode(node Node) {
+func (t *CarbonHashRing) AddNode(node Node) {
 	//log.Printf("insertRing(): %s", node.KeyValue())
 	t.nodes = append(t.nodes, node)
 	for i := 0; i < t.replicas; i++ {
@@ -179,7 +216,7 @@ func (t *HashRing) AddNode(node Node) {
 	}
 }
 
-func (t *HashRing) RemoveNode(node Node) {
+func (t *CarbonHashRing) RemoveNode(node Node) {
 	var i int
 
 	// Find node in nodes
@@ -201,7 +238,7 @@ func (t *HashRing) RemoveNode(node Node) {
 	}
 }
 
-func (t *HashRing) GetNode(key string) Node {
+func (t *CarbonHashRing) GetNode(key string) Node {
 	if len(t.ring) == 0 {
 		panic("HashRing is empty")
 	}
@@ -219,7 +256,7 @@ func (t *HashRing) GetNode(key string) Node {
 	return t.ring[i].node
 }
 
-func (t *HashRing) GetNodes(key string) []Node {
+func (t *CarbonHashRing) GetNodes(key string) []Node {
 	if len(t.ring) == 0 {
 		panic("HashRing is empty")
 	}
@@ -242,7 +279,7 @@ func (t *HashRing) GetNodes(key string) []Node {
 	return result
 }
 
-func (t *HashRing) BucketsPerNode() map[string]int {
+func (t *CarbonHashRing) BucketsPerNode() map[string]int {
 	if len(t.ring) == 0 {
 		panic("HashRing is empty")
 	}
@@ -266,8 +303,13 @@ func (t *HashRing) BucketsPerNode() map[string]int {
 }
 
 // Len return the number of buckets or nodes in the hash ring.
-func (t *HashRing) Len() int {
+func (t *CarbonHashRing) Len() int {
 	return len(t.nodes)
+}
+
+// Nodes returns the nodes in the carbon hash ring
+func (t *CarbonHashRing) Nodes() []Node {
+	return t.nodes
 }
 
 // mod returns a modulo b which is not the same as Go's a % b operator.

@@ -9,6 +9,13 @@ const (
 	Version = "0.1.6"
 )
 
+// SupportedHashTypes is the string identifiers of the hashing algorithms
+// used for the consistent hash ring.  This slice must be sorted.
+var SupportedHashTypes = []string{
+	"carbon",
+	"jump_fnv1a",
+}
+
 // MetricStatType A JSON marshalable FileInfo type
 type MetricStatType struct {
 	Name    string // Filename
@@ -23,6 +30,7 @@ type MetricStatType struct {
 type JSONRingType struct {
 	Name  string
 	Nodes []string
+	Algo  string
 }
 
 func (j *JSONRingType) String() string {
