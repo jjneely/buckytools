@@ -28,9 +28,10 @@ type MetricStatType struct {
 // buckdy is running on and contains a slice of nodes which are
 // "server:instance" (where ":instance" is optional) formatted strings
 type JSONRingType struct {
-	Name  string
-	Nodes []string
-	Algo  string
+	Name     string
+	Nodes    []string
+	Algo     string
+	Replicas int
 }
 
 func (j *JSONRingType) String() string {

@@ -52,7 +52,7 @@ func unmarshalList(encoded string) ([]string, error) {
 
 // parseRing builds a representation of the hashring from the command
 // line arguments
-func parseRing(hostname, algo string) *JSONRingType {
+func parseRing(hostname, algo string, replicas int) *JSONRingType {
 	if flag.NArg() < 0 {
 		log.Fatalf("You must have at least 1 node in your hash ring")
 	}
@@ -60,6 +60,7 @@ func parseRing(hostname, algo string) *JSONRingType {
 	ring.Nodes = make([]string, 0)
 	ring.Name = hostname
 	ring.Algo = algo
+	ring.Replicas = replicas
 	for i := 0; i < flag.NArg(); i++ {
 		var n string
 		switch strings.Count(flag.Arg(i), ":") {
@@ -85,6 +86,7 @@ func parseRing(hostname, algo string) *JSONRingType {
 }
 
 func main() {
+	var replicas int
 	var hashType string
 	var bindAddress string
 	hostname, err := os.Hostname()
@@ -107,6 +109,8 @@ func main() {
 		"This node's name in the Graphite consistent hash ring.")
 	flag.StringVar(&hashType, "hash", "carbon",
 		fmt.Sprintf("Consistent Hash algorithm to use: %v", SupportedHashTypes))
+	flag.IntVar(&replicas, "replicas", 1,
+		"Number of copies of each metric in the cluster.")
 	flag.Parse()
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)
@@ -114,7 +118,7 @@ func main() {
 		log.Fatalf("Invalide hash type.  Supported types: %v",
 			SupportedHashTypes)
 	}
-	hashring = parseRing(hostname, hashType)
+	hashring = parseRing(hostname, hashType, replicas)
 
 	http.HandleFunc("/", http.NotFound)
 	http.HandleFunc("/metrics", listMetrics)
