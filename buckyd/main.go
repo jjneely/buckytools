@@ -79,7 +79,7 @@ func parseRing(hostname, algo string, replicas int) *JSONRingType {
 			log.Fatalf("Error parsing hashring members from cli.")
 		}
 
-		ring.Nodes = append(hashring.Nodes, n)
+		ring.Nodes = append(ring.Nodes, n)
 	}
 
 	return ring

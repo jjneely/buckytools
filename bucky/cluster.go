@@ -64,16 +64,6 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 	Cluster = new(ClusterConfig)
 	Cluster.Port = port
 	Cluster.Servers = make([]string, 0)
-	for _, v := range master.Nodes {
-		// strip instance values
-		fields := strings.Split(v, ":")
-		Cluster.Servers = append(Cluster.Servers, fields[0])
-		if len(fields) < 2 {
-			fields = append(fields, "")
-		}
-		Cluster.Hash.AddNode(hashing.Node{fields[0], fields[1]})
-	}
-
 	switch master.Algo {
 	case "carbon":
 		Cluster.Hash = hashing.NewCarbonHashRing()
@@ -82,6 +72,16 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 	default:
 		log.Printf("Unknown consistent hash algorithm: %s", master.Algo)
 		return nil, fmt.Errorf("Unknown consistent hash algorithm: %s", master.Algo)
+	}
+
+	for _, v := range master.Nodes {
+		// strip instance values
+		fields := strings.Split(v, ":")
+		Cluster.Servers = append(Cluster.Servers, fields[0])
+		if len(fields) < 2 {
+			fields = append(fields, "")
+		}
+		Cluster.Hash.AddNode(hashing.Node{fields[0], fields[1]})
 	}
 
 	members := make([]*JSONRingType, 0)

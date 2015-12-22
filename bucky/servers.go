@@ -29,7 +29,7 @@ func serversCommand(c Command) int {
 	}
 
 	fmt.Printf("Buckd daemons are using port: %s\n", Cluster.Port)
-	fmt.Printf("Hashing algorithm: %t\n", Cluster.Hash)
+	fmt.Printf("Hashing algorithm: %v\n", Cluster.Hash)
 	fmt.Printf("Number of replicas: %d\n", Cluster.Hash.Replicas())
 	fmt.Printf("Found these servers:\n")
 
