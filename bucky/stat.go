@@ -141,20 +141,20 @@ func StatJSONMetrics(servers []string, fd io.Reader, force bool) error {
 
 // statCommand runs this subcommand.
 func statCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
-	var err error
 	if c.Flag.NArg() == 0 {
 		log.Fatal("At least one argument is required.")
 	} else if listRegexMode && c.Flag.NArg() > 0 {
-		err = StatRegexMetrics(servers, c.Flag.Arg(0), listForce)
+		err = StatRegexMetrics(Cluster.HostPorts(), c.Flag.Arg(0), listForce)
 	} else if c.Flag.Arg(0) != "-" {
-		err = StatSliceMetrics(servers, c.Flag.Args(), listForce)
+		err = StatSliceMetrics(Cluster.HostPorts(), c.Flag.Args(), listForce)
 	} else {
-		err = StatJSONMetrics(servers, os.Stdin, listForce)
+		err = StatJSONMetrics(Cluster.HostPorts(), os.Stdin, listForce)
 	}
 
 	if err != nil {

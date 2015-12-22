@@ -83,12 +83,11 @@ func backfillWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
 // of old metric => new metric.  The new metric name will have the data from
 // the old metric backfilled into it.
 func BackfillMetrics(metricMap map[string]string) error {
-	hostPorts := GetAllBuckyd()
-	if len(hostPorts) == 0 {
+	hostPorts := Cluster.HostPorts()
+	if len(hostPorts) == 0 || !Cluster.Healthy {
 		log.Printf("Cluster is unhealthy or error finding cluster members.")
 		return fmt.Errorf("Cluster is unhealthy.")
 	}
-	hr := buildHashRing(GetRings())
 
 	// Generate a list of srouce metrics
 	srcMetrics := make([]string, 0)
@@ -124,7 +123,7 @@ func BackfillMetrics(metricMap map[string]string) error {
 		work.oldName = m
 		work.newName = CleanMetric(metricMap[m])
 		work.oldLocation = server
-		work.newLocation = hr.GetNode(work.newName).Server
+		work.newLocation = Cluster.Hash.GetNode(work.newName).Server
 
 		workIn <- work
 		c++
@@ -171,10 +170,16 @@ func backfillCommand(c Command) int {
 
 	var err error
 	var fd *os.File
+	_, err = GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
+		return 1
+	}
+
 	if c.Flag.Arg(0) != "-" {
 		fd, err = os.Open(c.Flag.Arg(0))
 		if err != nil {
-			log.Fatal("Error opening tar archive: %s", err)
+			log.Fatal("Error opening json map: %s", err)
 		}
 		defer fd.Close()
 	} else {

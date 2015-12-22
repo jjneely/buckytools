@@ -48,7 +48,7 @@ func DeleteMetric(server, metric string) error {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric,
 	}
 
@@ -93,7 +93,7 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + name,
 	}
 	r, err := http.NewRequest("GET", u.String(), nil)
@@ -135,7 +135,7 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric,
 	}
 

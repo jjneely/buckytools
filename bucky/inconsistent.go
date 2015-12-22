@@ -44,7 +44,6 @@ func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 	}
 
 	results := make(map[string][]string)
-	ring := buildHashRing(GetRings())
 	log.Printf("Hashing...")
 	t := time.Now().Unix()
 	for server, metrics := range list {
@@ -54,7 +53,7 @@ func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 				// is done.  They will never be consistent and shouldn't be.
 				continue
 			}
-			if ring.GetNode(m).Server != server {
+			if Cluster.Hash.GetNode(m).Server != server {
 				results[server] = append(results[server], m)
 			}
 		}
@@ -75,13 +74,16 @@ func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 
 // inconsistentCommand runs this subcommand.
 func inconsistentCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
-	var err error
-	results, err := InconsistentMetrics(servers)
+	if !Cluster.Healthy {
+		log.Printf("Warning: Cluster is not healthy!")
+	}
+	results, err := InconsistentMetrics(Cluster.HostPorts())
 	if JSONOutput {
 		blob, err := json.Marshal(results)
 		if err != nil {

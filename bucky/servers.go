@@ -22,8 +22,9 @@ is alive.`
 
 // serversCommand runs this subcommand.
 func serversCommand(c Command) int {
-	_ = GetClusterConfiguration(HostPort)
-	if rings == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 

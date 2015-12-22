@@ -137,20 +137,20 @@ func DeleteJSONMetrics(servers []string, fd io.Reader, force bool) error {
 
 // deleteCommand runs this subcommand.
 func deleteCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
-	var err error
 	if c.Flag.NArg() == 0 {
 		log.Fatal("At least one argument is required.")
 	} else if deleteRegexMode && c.Flag.NArg() > 0 {
-		err = DeleteRegexMetrics(servers, c.Flag.Arg(0), deleteForce)
+		err = DeleteRegexMetrics(Cluster.HostPorts(), c.Flag.Arg(0), deleteForce)
 	} else if c.Flag.Arg(0) != "-" {
-		err = DeleteSliceMetrics(servers, c.Flag.Args(), deleteForce)
+		err = DeleteSliceMetrics(Cluster.HostPorts(), c.Flag.Args(), deleteForce)
 	} else {
-		err = DeleteJSONMetrics(servers, os.Stdin, deleteForce)
+		err = DeleteJSONMetrics(Cluster.HostPorts(), os.Stdin, deleteForce)
 	}
 
 	if err != nil {

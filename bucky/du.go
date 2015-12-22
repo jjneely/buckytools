@@ -142,21 +142,21 @@ func DuJSONMetrics(servers []string, fd io.Reader, force bool) (int, error) {
 
 // duCommand runs this subcommand.
 func duCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
-	var err error
 	var storage int
 	if c.Flag.NArg() == 0 {
 		log.Fatal("At least one argument is required.")
 	} else if listRegexMode && c.Flag.NArg() > 0 {
-		storage, err = DuRegexMetrics(servers, c.Flag.Arg(0), listForce)
+		storage, err = DuRegexMetrics(Cluster.HostPorts(), c.Flag.Arg(0), listForce)
 	} else if c.Flag.Arg(0) != "-" {
-		storage, err = DuSliceMetrics(servers, c.Flag.Args(), listForce)
+		storage, err = DuSliceMetrics(Cluster.HostPorts(), c.Flag.Args(), listForce)
 	} else {
-		storage, err = DuJSONMetrics(servers, os.Stdin, listForce)
+		storage, err = DuJSONMetrics(Cluster.HostPorts(), os.Stdin, listForce)
 	}
 
 	log.Printf("%d Bytes", storage)

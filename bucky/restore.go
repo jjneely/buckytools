@@ -13,7 +13,6 @@ import (
 	"sync"
 )
 
-import "github.com/jjneely/buckytools/hashing"
 import "github.com/jjneely/buckytools/metrics"
 
 var tarPrefix string
@@ -60,7 +59,7 @@ func PostMetric(server string, metric *MetricData) error {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric.Name,
 	}
 
@@ -90,9 +89,9 @@ func PostMetric(server string, metric *MetricData) error {
 	return nil
 }
 
-func restoreTarWorker(workIn chan *MetricData, ring *hashing.HashRing, servers []string, wg *sync.WaitGroup) {
+func restoreTarWorker(workIn chan *MetricData, servers []string, wg *sync.WaitGroup) {
 	for work := range workIn {
-		server := ring.GetNode(work.Name).Server
+		server := Cluster.Hash.GetNode(work.Name).Server
 		if SingleHost && server != servers[0] {
 			log.Printf("In single mode, skipping metric %s for server %s", work.Name, server)
 			continue
@@ -109,12 +108,11 @@ func restoreTarWorker(workIn chan *MetricData, ring *hashing.HashRing, servers [
 func RestoreTar(servers []string, fd *os.File) error {
 	wg := new(sync.WaitGroup)
 	workIn := make(chan *MetricData, 25)
-	ring := buildHashRing(GetRings())
 	tr := tar.NewReader(fd)
 
 	wg.Add(metricWorkers)
 	for i := 0; i < metricWorkers; i++ {
-		go restoreTarWorker(workIn, ring, servers, wg)
+		go restoreTarWorker(workIn, servers, wg)
 	}
 
 	for {
@@ -159,24 +157,28 @@ func RestoreTar(servers []string, fd *os.File) error {
 
 // restoreCommand runs this subcommand.
 func restoreCommand(c Command) int {
-	servers := GetAllServers()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
 	if c.Flag.NArg() == 0 {
 		log.Fatal("At least one argument is required.")
 	}
+	if !Cluster.Healthy {
+		log.Printf("Cluster is not optimal.")
+		return 1
+	}
 
-	var err error
 	if c.Flag.Arg(0) != "-" {
 		fd, err := os.Open(c.Flag.Arg(0))
 		if err != nil {
 			log.Fatal("Error opening tar archive: %s", err)
 		}
-		err = RestoreTar(servers, fd)
+		err = RestoreTar(Cluster.HostPorts(), fd)
 	} else {
-		err = RestoreTar(servers, os.Stdin)
+		err = RestoreTar(Cluster.HostPorts(), os.Stdin)
 	}
 
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 )
 
 import "github.com/jjneely/buckytools/hashing"
+import . "github.com/jjneely/buckytools"
 
 type ClusterConfig struct {
 	// Port is the port remote buckyd daemons listen on
@@ -29,13 +30,13 @@ type ClusterConfig struct {
 // Cluster is the working and cached cluster configuration
 var Cluster *ClusterConfig
 
-func GetClusterServersPorts() []string {
-	if Cluster == nil {
+func (c *ClusterConfig) HostPorts() []string {
+	if c == nil {
 		return nil
 	}
 	ret := make([]string, 0)
-	for _, v := range Cluster.Servers {
-		ret = append(ret, fmt.Sprintf("%s:%s", v, Cluster.Port))
+	for _, v := range c.Servers {
+		ret = append(ret, fmt.Sprintf("%s:%s", v, c.Port))
 	}
 	return ret
 }
@@ -92,7 +93,7 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 		host := fmt.Sprintf("%s:%s", srv, Cluster.Port)
 		member, err := GetSingleHashRing(host)
 		if err != nil {
-			log.Errorf("Cluster unhealthy: %s: %s", server, err)
+			log.Printf("Cluster unhealthy: %s: %s", server, err)
 		}
 		members = append(members, member)
 	}
@@ -111,7 +112,7 @@ func isHealthy(master *JSONRingType, ring []*JSONRingType) bool {
 	}
 
 	// We compare each ring to the first one
-	for i, v := range ring {
+	for _, v := range ring {
 		// Order, host:instance pair, must be the same.  You configured
 		// your cluster with a CM tool, right?
 		if master.Algo != v.Algo {

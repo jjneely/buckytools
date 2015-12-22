@@ -104,13 +104,12 @@ func countMap(metricsMap map[string][]string) int {
 // locate additional Buckyd daemons not in the current hash ring.  This
 // will effectively drain all metrics off of these hosts.
 func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
-	hostPorts := GetAllBuckyd()
+	hostPorts := Cluster.HostPorts()
 	hostPorts = append(hostPorts, extraHostPorts...)
-	if len(hostPorts) == 0 {
+	if len(hostPorts) == 0 || !Cluster.Healthy {
 		log.Printf("Cluster is unhealthy or error finding cluster members.")
 		return fmt.Errorf("Cluster is unhealthy.")
 	}
-	hr := buildHashRing(GetRings())
 
 	metricMap, err := InconsistentMetrics(hostPorts)
 	if err != nil {
@@ -138,7 +137,7 @@ func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 			work.oldName = m
 			work.newName = m
 			work.oldLocation = server
-			work.newLocation = hr.GetNode(work.newName).Server
+			work.newLocation = Cluster.Hash.GetNode(work.newName).Server
 
 			id := fmt.Sprintf("[%s] %s", server, m)
 			jobs[id] = work
@@ -176,9 +175,13 @@ func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 
 // rebalanceCommand runs this subcommand.
 func rebalanceCommand(c Command) int {
-	var err error
-	var oldBuckyd []string
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
+		return 1
+	}
 
+	var oldBuckyd []string
 	for i := 0; i < c.Flag.NArg(); i++ {
 		oldBuckyd = append(oldBuckyd, c.Flag.Arg(i))
 	}
