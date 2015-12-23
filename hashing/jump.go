@@ -59,6 +59,7 @@ func NewJumpHashRing(replicas int) *JumpHashRing {
 // String displays the buckets in the hashring and their index numbers.
 func (chr *JumpHashRing) String() string {
 	s := make([]string, 0)
+	s = append(s, "jump_fnv1a:")
 	for i := range chr.ring {
 		s = append(s, fmt.Sprintf("%3d:%s", i, chr.ring[i].Server))
 	}
@@ -111,7 +112,7 @@ func (chr *JumpHashRing) RemoveNode(node Node) {
 func (chr *JumpHashRing) GetNode(key string) Node {
 	var key64 uint64 = Fnv1a64([]byte(key))
 	idx := Jump(key64, len(chr.ring))
-	fmt.Printf("JUMP: %s => %x => %d\n", key, key64, idx)
+	//fmt.Printf("JUMP: %s => %x => %d\n", key, key64, idx)
 	return chr.ring[idx]
 }
 

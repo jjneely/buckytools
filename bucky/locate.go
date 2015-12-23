@@ -40,10 +40,16 @@ func LocateSliceMetrics(metrics []string) map[string]string {
 	}
 
 	result := make(map[string]string)
+	spread := make(map[string]int)
 	for _, key := range metrics {
 		// XXX: we toss away instance info here due to our assumption that a
 		// graphite node has one whisper db store
 		result[key] = Cluster.Hash.GetNode(key).Server
+		spread[result[key]]++
+	}
+
+	for k, v := range spread {
+		log.Printf("%d metrics assigned to %s", v, k)
 	}
 
 	return result

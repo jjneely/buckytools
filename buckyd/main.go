@@ -53,7 +53,7 @@ func unmarshalList(encoded string) ([]string, error) {
 // parseRing builds a representation of the hashring from the command
 // line arguments
 func parseRing(hostname, algo string, replicas int) *JSONRingType {
-	if flag.NArg() < 0 {
+	if flag.NArg() < 1 {
 		log.Fatalf("You must have at least 1 node in your hash ring")
 	}
 	ring := new(JSONRingType)

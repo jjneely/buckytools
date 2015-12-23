@@ -192,7 +192,7 @@ func (t *CarbonHashRing) String() string {
 	for i := 0; i < len(t.nodes); i++ {
 		servers = append(servers, t.nodes[i].String())
 	}
-	return fmt.Sprintf("[HashRing: %d nodes, %d replicas, %d ring members %s]",
+	return fmt.Sprintf("[carbon: %d nodes, %d replicas, %d ring members %s]",
 		len(t.nodes), t.replicas, len(t.ring), strings.Join(servers, " "))
 }
 

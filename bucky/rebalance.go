@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 )
 
@@ -131,7 +132,10 @@ func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 
 	// build an order of jobs not dependent on location
 	jobs := make(map[string]*MigrateWork)
+	moves := make(map[string]int)
+	servers := make([]string, 0)
 	for server, metrics := range metricMap {
+		servers = append(servers, server)
 		for _, m := range metrics {
 			work := new(MigrateWork)
 			work.oldName = m
@@ -141,11 +145,17 @@ func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 
 			id := fmt.Sprintf("[%s] %s", server, m)
 			jobs[id] = work
+			moves[server]++
 
 			if noOp {
 				log.Printf("%s => %s", id, work.newLocation)
 			}
 		}
+	}
+
+	sort.Strings(servers)
+	for _, server := range servers {
+		log.Printf("%d metrics on %s must be relocated", moves[server], server)
 	}
 
 	if noOp {
