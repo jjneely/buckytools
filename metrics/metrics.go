@@ -7,10 +7,19 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 )
+
+// TimeSeries is the in memory and transit representation of time series
+// data.
+type TimeSeries struct {
+	Epoch    int64     `json: epoch`
+	Interval int64     `json: interval`
+	Values   []float64 `json: values`
+}
 
 type MetricsCacheType struct {
 	metrics   []string
@@ -30,26 +39,29 @@ func init() {
 }
 
 // MetricToPath takes a metric name and return an absolute path
-// using the --prefix flag.
-func MetricToPath(metric string) string {
-	p := MetricToRelative(metric)
+// using the --prefix flag.  You must supply the metric file's path suffix
+// such as ".wsp".
+func MetricToPath(metric, suffix string) string {
+	p := MetricToRelative(metric, suffix)
 	return path.Join(Prefix, p)
 }
 
 // MetricToRelative take a metric name and returns a relative path
 // to the Whisper DB.  This path combined with the root path to the
-// DB store would create a proper absolute path.
-func MetricToRelative(metric string) string {
-	p := strings.Replace(metric, ".", "/", -1) + ".wsp"
+// DB store would create a proper absolute path.  You must supply the file's
+// path suffix such as ".wsp".
+func MetricToRelative(metric, suffix string) string {
+	p := strings.Replace(metric, ".", "/", -1) + suffix
 	return path.Clean(p)
 }
 
 // MetricsToPaths operates on a slice of metric names and returns a
-// slice of absolute paths using the --prefix flag.
-func MetricsToPaths(metrics []string) []string {
+// slice of absolute paths using the --prefix flag.  Suffix such as ".wsp"
+// is required.
+func MetricsToPaths(metrics []string, suffix string) []string {
 	p := make([]string, 0)
 	for _, m := range metrics {
-		p = append(p, MetricToPath(m))
+		p = append(p, MetricToPath(m, suffix))
 	}
 
 	return p
@@ -67,9 +79,7 @@ func PathToMetric(p string) string {
 	if strings.HasPrefix(p, "/") {
 		p = p[1:]
 	}
-
-	p = strings.Replace(p, ".wsp", "", 1)
-	return strings.Replace(p, "/", ".", -1)
+	return RelativeToMetric(p)
 }
 
 // RelativeToMetric takes a relative path from the root of your DB store
@@ -77,8 +87,11 @@ func PathToMetric(p string) string {
 // transformed.
 func RelativeToMetric(p string) string {
 	p = path.Clean(p)
-	p = strings.Replace(p, ".wsp", "", 1)
-	return strings.Replace(p, "/", ".", -1)
+	dir, file := path.Split(p)
+	dir = strings.Replace(dir, "/", ".", -1)
+	// Any "." in the file begins meta information, like .wsp for Whisper DBs
+	file = strings.Split(file, ".")[0]
+	return dir + file
 }
 
 // PathsToMetrics operates on a slice of absolute paths prefixed with
@@ -127,8 +140,8 @@ func FilterRegex(regex string, metrics []string) ([]string, error) {
 	return result, nil
 }
 
-// checkWalk is a helper function to sanity check for *.wsp files in a
-// file tree walk.  If the file is valid, normal *.wsp nil is returned.
+// checkWalk is a helper function to sanity check for timeseries DB files in a
+// file tree walk.  If the file is valid, normal timeseries nil is returned.
 // Otherwise a non-nil error value is returned.
 func checkWalk(path string, info os.FileInfo, err error) (bool, error) {
 	// Did the Walk function hit an error on this file?
@@ -150,12 +163,15 @@ func checkWalk(path string, info os.FileInfo, err error) (bool, error) {
 		// Not a regular file
 		return false, nil
 	}
-	if !strings.HasSuffix(path, ".wsp") {
-		// Not a Whisper Database
-		return false, nil
+	if strings.HasSuffix(path, ".tsj") {
+		return true, nil
+	}
+	if strings.HasSuffix(path, ".wsp") {
+		return true, nil
 	}
 
-	return true, nil
+	// Not a Whisper Database
+	return false, nil
 }
 
 // NewMetricsCache creates and returns a MetricsCacheType object
@@ -166,13 +182,13 @@ func NewMetricsCache() *MetricsCacheType {
 	return m
 }
 
-// IsAvailable returns a boolean true value if the MetricsCache is avaliable
+// IsAvailable returns a boolean true value if the MetricsCache is available
 // for use.  Rebuilding the cache can take some time.
 func (m *MetricsCacheType) IsAvailable() bool {
 	return m.metrics != nil && !m.updating
 }
 
-// TimedOut returns true if the cache hasn't been refresed recently.
+// TimedOut returns true if the cache hasn't been refreshed recently.
 func (m *MetricsCacheType) TimedOut() bool {
 	// 1 hour cache timeout
 	return time.Now().Unix()-m.timestamp > 3600
@@ -191,7 +207,6 @@ func (m *MetricsCacheType) RefreshCache() error {
 			return err
 		}
 		if ok {
-			//log.Printf("Found %s or %s", path, PathToMetric(path))
 			m.metrics = append(m.metrics, PathToMetric(path))
 		}
 		return nil
@@ -204,6 +219,15 @@ func (m *MetricsCacheType) RefreshCache() error {
 	log.Printf("Scan complete.")
 	if err != nil {
 		log.Printf("Scan returned an Error: %s", err)
+	}
+
+	// Sort and Unique
+	sort.Strings(m.metrics)
+	length := len(m.metrics) - 1
+	for i := 0; i < length; i++ {
+		if m.metrics[i] == m.metrics[i+1] {
+			m.metrics = append(m.metrics[:i], m.metrics[i+1:]...)
+		}
 	}
 
 	m.timestamp = time.Now().Unix()
