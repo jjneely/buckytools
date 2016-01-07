@@ -67,7 +67,8 @@ func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {
 	for work := range workOut {
 		log.Printf("Writing %s...", work.Name)
 		th := new(tar.Header)
-		th.Name = metrics.MetricToRelative(work.Name)
+		// XXX: Hard coded for Whisper DBs!
+		th.Name = metrics.MetricToRelative(work.Name, ".wsp")
 		th.Size = work.Size
 		th.Mode = work.Mode
 		th.ModTime = time.Unix(work.ModTime, 0)
