@@ -124,6 +124,7 @@ func main() {
 	http.HandleFunc("/metrics", listMetrics)
 	http.HandleFunc("/metrics/", serveMetrics)
 	http.HandleFunc("/hashring", listHashring)
+	http.HandleFunc("/timeseries/", serveTimeSeries)
 
 	log.Printf("Starting server on %s", bindAddress)
 	err = http.ListenAndServe(bindAddress, nil)

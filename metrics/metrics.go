@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -12,6 +13,9 @@ import (
 	"sync"
 	"time"
 )
+
+import "github.com/jjneely/journal/timeseries"
+import "github.com/jjneely/journal"
 
 // TimeSeries is the in memory and transit representation of time series
 // data.
@@ -36,6 +40,31 @@ func init() {
 		"The root of the whisper database store.")
 	flag.StringVar(&Prefix, "p", "/opt/graphite/storage/whisper",
 		"The root of the whisper database store.")
+}
+
+// JournalFetch is a convienance wrapper around reading from timeseries
+// journals
+func JournalFetch(j timeseries.Journal, from, until int64) (*TimeSeries, error) {
+	// Integer division and inclusive!
+	n := int((until - from) / j.Interval())
+	values, err := j.Read(from, n)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := new(TimeSeries)
+	ret.Epoch = from - (from % j.Interval())
+	ret.Interval = j.Interval()
+	ret.Values = []float64(values.(journal.Float64Values))
+
+	return ret, nil
+}
+
+func JournalUpdate(j timeseries.Journal, ts *TimeSeries) error {
+	if ts.Interval != j.Interval() {
+		return fmt.Errorf("Interval mismatch.")
+	}
+	return j.Write(ts.Epoch, journal.Float64Values(ts.Values))
 }
 
 // MetricToPath takes a metric name and return an absolute path

@@ -4,9 +4,9 @@ Buckyd REST API Specification
 /metrics
 --------
 
-Returns a JSON array listing the metrics on the local host.  May return a status
-code of 202 Accepted when the internal cache is being rebuilt.  In that case
-the client should sleep and try again.
+Returns a JSON array listing the metrics on the local host.  May return a
+status code of 202 Accepted when the internal cache is being rebuilt.  In that
+case the client should sleep and try again.
 
 Methods:
 
@@ -39,6 +39,21 @@ Methods:
   overwrite existing points, but will fill in data if the matching on disk
   data point is null.  See Carbonate's whisper-fill.py.
 * DELETE - Remove this metric from the file system.
+
+/timeseries/<metric.key>
+------------------------
+
+Operates on timeseries data contained within the Graphite style metric.key.
+These operations accept/return a JSON dict value with integer keys 'epoch',
+'interval', and a list of floats stored as 'values'.
+
+XXX: Protobufs in the future
+
+Methods:
+* POST - commit these data points to disk.  200 OK is returned after a
+  successful write operation.  No caching at this layer.
+* GET - Supply query parameters of 'from' and optionally 'until' to retrieve
+  a set of values from on disk storage.
 
 /hashring
 ---------

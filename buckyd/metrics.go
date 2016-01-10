@@ -81,7 +81,8 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 	logRequest(r)
 
 	metric := r.URL.Path[len("/metrics/"):]
-	path := MetricToPath(metric)
+	// XXX: Hardcoded for Whisper DBs
+	path := MetricToPath(metric, ".wsp")
 	if len(metric) == 0 {
 		http.Error(w, "Metric name missing.", http.StatusBadRequest)
 		return
