@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,6 +25,7 @@ import (
 
 var httpClient = new(http.Client)
 var host string
+var confirm bool
 
 func usage() {
 	fmt.Printf("%s [options] buckydaemon:port prefix\n", os.Args[0])
@@ -35,24 +37,37 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func FindValidDataPoints(wsp *whisper.Whisper) (*whisper.TimeSeries, error) {
+func FindValidDataPoints(wsp *whisper.Whisper) (*metrics.TimeSeries, error) {
 	retentions := whisper.RetentionsByPrecision{wsp.Retentions()}
 	sort.Sort(retentions)
 
 	start := int(time.Now().Unix())
 	from := 0
-	for _, r := range retentions.Iterator() {
-		from = int(time.Now().Unix()) - r.MaxRetention()
+	r := retentions.Iterator()[0]
+	from = int(time.Now().Unix()) - r.MaxRetention()
 
-		ts, err := wsp.Fetch(from, start)
-		if err != nil {
-			return nil, err
-		}
-		return ts, nil
+	ts, err := wsp.Fetch(from, start)
+	if err != nil {
+		return nil, err
 	}
 
-	// we don't get here.
-	return nil, nil
+	tsj := new(metrics.TimeSeries)
+	tsj.Epoch = int64(ts.FromTime())
+	tsj.Interval = int64(ts.Step())
+	tsj.Values = make([]metrics.MarshalFloat64, 0)
+	values := ts.Values()
+	for math.IsNaN(values[0]) {
+		tsj.Epoch = tsj.Epoch + tsj.Interval
+		values = values[1:]
+	}
+	for math.IsNaN(values[len(values)-1]) {
+		values = values[:len(values)-1]
+	}
+
+	for _, f := range values {
+		tsj.Values = append(tsj.Values, metrics.MarshalFloat64(f))
+	}
+	return tsj, nil
 }
 
 func examine(path string, info os.FileInfo, err error) error {
@@ -92,15 +107,15 @@ func examine(path string, info os.FileInfo, err error) error {
 		return err
 	}
 
+	log.Printf("Converting : %s", path)
+	log.Printf("Metric name: %s", metric)
 	commitTimeSeries(ts, metric)
 	return nil
 }
 
-func commitTimeSeries(ts *whisper.TimeSeries, metric string) {
-	tsj := new(metrics.TimeSeries)
-	tsj.Epoch = int64(ts.FromTime())
-	tsj.Interval = int64(ts.Step())
-	tsj.Values = ts.Values()
+func commitTimeSeries(tsj *metrics.TimeSeries, metric string) {
+	log.Printf("Committing: Epoch = %d, Int = %d, len(values) = %d",
+		tsj.Epoch, tsj.Interval, len(tsj.Values))
 
 	u := &url.URL{
 		Scheme: "http",
@@ -109,6 +124,10 @@ func commitTimeSeries(ts *whisper.TimeSeries, metric string) {
 	}
 
 	blob, err := json.Marshal(tsj)
+	if err != nil {
+		log.Printf("Error marshaling JSON data: %s", err)
+		return
+	}
 	buf := bytes.NewBuffer(blob)
 	r, err := httpClient.Post(u.String(), "application/json", buf)
 	if err != nil {
@@ -124,13 +143,70 @@ func commitTimeSeries(ts *whisper.TimeSeries, metric string) {
 			log.Printf("%s: No body", r.Status)
 		}
 	}
-	os.Exit(2)
+	if confirm {
+		confirmData(metric, tsj)
+	}
+}
+
+func confirmData(metric string, data *metrics.TimeSeries) {
+	u := &url.URL{
+		Scheme: "http",
+		Host:   host,
+		Path:   "/timeseries/" + metric,
+	}
+	r, err := httpClient.Get(u.String())
+	if err != nil {
+		log.Printf("Error GET'ing back data: %s", err)
+		return
+	}
+
+	// This is a test, we assume that we are converting data to the new format
+	// so when we do a GET expecting all TSJ data to be returned, we should
+	// get back the same JSON blob, right?
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body to confirm data: %s", err)
+		return
+	}
+	if r.StatusCode != 200 {
+		log.Printf("GET request failed with: %s: %s", r.Status, string(body))
+		return
+	}
+	tsj := new(metrics.TimeSeries)
+	err = json.Unmarshal(body, tsj)
+	if err != nil {
+		log.Printf("Could not unmarshal remote's JSON to compare: %s", err)
+		return
+	}
+
+	if tsj.Epoch != data.Epoch || tsj.Interval != data.Interval {
+		log.Printf("Warning: Data returns has unmatched E/I: %d / %d",
+			tsj.Epoch, tsj.Interval)
+		return
+	}
+	if len(tsj.Values) != len(data.Values) {
+		log.Printf("Warning: Value slices not the same length: %d / %d",
+			len(tsj.Values), len(data.Values))
+		return
+	}
+	var flag = true
+	for i, _ := range tsj.Values {
+		if tsj.Values[i] != data.Values[i] {
+			log.Printf("Index: %d:  %f != %f", i, tsj.Values[i], data.Values[i])
+			flag = false
+		}
+	}
+	if !flag {
+		log.Printf("Warning: Data in series doesn't match")
+	}
 }
 
 func main() {
 	var version bool
 	flag.Usage = usage
 	flag.BoolVar(&version, "version", false, "Display version information.")
+	flag.BoolVar(&confirm, "confirm", false, "Query time series data back and compare.")
 	flag.Parse()
 
 	if version {

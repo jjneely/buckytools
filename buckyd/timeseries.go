@@ -36,17 +36,19 @@ func serveTimeSeries(w http.ResponseWriter, r *http.Request) {
 func getTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 	// XXX: Need to know about the data partitions we have on disk
 	// XXX: Support Whisper DB fallback?
+	var from, until int64
+	var err error
 	path := metrics.MetricToPath(metric, ".tsj")
 	if r.FormValue("from") == "" {
-		http.Error(w, "No from timestamp.", http.StatusBadRequest)
-		return
+		from = 0
+	} else {
+		from, err = strconv.ParseInt(r.FormValue("from"), 0, 64)
+		if err != nil {
+			http.Error(w, "from: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
-	from, err := strconv.ParseInt(r.FormValue("from"), 0, 64)
-	if err != nil {
-		http.Error(w, "from: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	var until int64
+
 	if r.FormValue("until") == "" {
 		until = time.Now().Unix()
 	} else {
@@ -71,6 +73,7 @@ func getTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 		log.Printf("Error opening journal: %s", err)
 		return
 	}
+	defer j.Close()
 
 	ret, err := metrics.JournalFetch(j, from, until)
 	if err != nil {
@@ -96,8 +99,8 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 	path := metrics.MetricToPath(metric, ".tsj")
 
 	// Does this request look sane?
-	if r.Header.Get("Content-Type") != "application/octet-stream" {
-		http.Error(w, "Content-Type must be application/octet-stream.",
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Accepted Content-Type: application/json",
 			http.StatusBadRequest)
 		log.Printf("postTimeSeries: content-type of %s, abort!",
 			r.Header.Get("Content-Type"))
@@ -105,6 +108,7 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 	}
 
 	blob, err := ioutil.ReadAll(r.Body)
+	log.Printf("Body: %v", string(blob[:256]))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("Error reading body in postTimeSeries: %s", err)
@@ -118,6 +122,10 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 		return
 	}
 
+	for i := 0; i < 20 && i < len(ts.Values); i++ {
+		log.Printf("Saw %v", ts.Values[i])
+	}
+
 	j, err := timeseries.Open(path)
 	if os.IsNotExist(err) {
 		j, err = timeseries.Create(path, MetricInterval(metric),
@@ -128,6 +136,8 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 		log.Printf("Error opening/creating timeseries journal: %s", err)
 		return
 	}
+	defer j.Close()
+
 	err = metrics.JournalUpdate(j, ts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
