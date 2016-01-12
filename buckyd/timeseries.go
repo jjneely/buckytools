@@ -128,7 +128,7 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 
 	j, err := timeseries.Open(path)
 	if os.IsNotExist(err) {
-		j, err = timeseries.Create(path, MetricInterval(metric),
+		j, err = timeseries.Create(path, ts.Interval,
 			journal.NewFloat64ValueType(), make([]int64, 0))
 	}
 	if err != nil {
