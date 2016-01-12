@@ -56,11 +56,11 @@ func FindValidDataPoints(wsp *whisper.Whisper) (*metrics.TimeSeries, error) {
 	tsj.Epoch = int64(ts.FromTime())
 	tsj.Interval = int64(ts.Step())
 	tsj.Values = ts.Values()
-	for math.IsNaN(tsj.Values[0]) {
+	for len(tsj.Values) > 0 && math.IsNaN(tsj.Values[0]) {
 		tsj.Epoch = tsj.Epoch + tsj.Interval
 		tsj.Values = tsj.Values[1:]
 	}
-	for math.IsNaN(tsj.Values[len(tsj.Values)-1]) {
+	for len(tsj.Values) > 0 && math.IsNaN(tsj.Values[len(tsj.Values)-1]) {
 		tsj.Values = tsj.Values[:len(tsj.Values)-1]
 	}
 
@@ -102,6 +102,10 @@ func examine(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		log.Printf("%s\n", err)
 		return err
+	}
+	if len(ts.Values) == 0 {
+		log.Printf("Empty Metric: %s", path)
+		return nil
 	}
 
 	log.Printf("Converting : %s", path)
