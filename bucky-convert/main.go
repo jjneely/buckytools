@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"time"
 )
+
+import "github.com/golang/protobuf/proto"
 
 import (
 	"github.com/jjneely/buckytools"
@@ -54,19 +55,15 @@ func FindValidDataPoints(wsp *whisper.Whisper) (*metrics.TimeSeries, error) {
 	tsj := new(metrics.TimeSeries)
 	tsj.Epoch = int64(ts.FromTime())
 	tsj.Interval = int64(ts.Step())
-	tsj.Values = make([]metrics.MarshalFloat64, 0)
-	values := ts.Values()
-	for math.IsNaN(values[0]) {
+	tsj.Values = ts.Values()
+	for math.IsNaN(tsj.Values[0]) {
 		tsj.Epoch = tsj.Epoch + tsj.Interval
-		values = values[1:]
+		tsj.Values = tsj.Values[1:]
 	}
-	for math.IsNaN(values[len(values)-1]) {
-		values = values[:len(values)-1]
+	for math.IsNaN(tsj.Values[len(tsj.Values)-1]) {
+		tsj.Values = tsj.Values[:len(tsj.Values)-1]
 	}
 
-	for _, f := range values {
-		tsj.Values = append(tsj.Values, metrics.MarshalFloat64(f))
-	}
 	return tsj, nil
 }
 
@@ -123,13 +120,13 @@ func commitTimeSeries(tsj *metrics.TimeSeries, metric string) {
 		Path:   "/timeseries/" + metric,
 	}
 
-	blob, err := json.Marshal(tsj)
+	blob, err := proto.Marshal(tsj)
 	if err != nil {
-		log.Printf("Error marshaling JSON data: %s", err)
+		log.Printf("Error marshaling protobuf data: %s", err)
 		return
 	}
 	buf := bytes.NewBuffer(blob)
-	r, err := httpClient.Post(u.String(), "application/json", buf)
+	r, err := httpClient.Post(u.String(), "application/protobuf", buf)
 	if err != nil {
 		log.Printf("HTTP POST Failed: %s", err)
 		return
@@ -160,10 +157,6 @@ func confirmData(metric string, data *metrics.TimeSeries) {
 		return
 	}
 
-	// This is a test, we assume that we are converting data to the new format
-	// so when we do a GET expecting all TSJ data to be returned, we should
-	// get back the same JSON blob, right?
-
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading body to confirm data: %s", err)
@@ -174,9 +167,9 @@ func confirmData(metric string, data *metrics.TimeSeries) {
 		return
 	}
 	tsj := new(metrics.TimeSeries)
-	err = json.Unmarshal(body, tsj)
+	err = proto.Unmarshal(body, tsj)
 	if err != nil {
-		log.Printf("Could not unmarshal remote's JSON to compare: %s", err)
+		log.Printf("Could not unmarshal remote's protobuf to compare: %s", err)
 		return
 	}
 
@@ -192,8 +185,8 @@ func confirmData(metric string, data *metrics.TimeSeries) {
 	}
 	var flag = true
 	for i, _ := range tsj.Values {
-		if tsj.Values[i] != data.Values[i] {
-			log.Printf("Index: %d:  %f != %f", i, tsj.Values[i], data.Values[i])
+		if !math.IsNaN(tsj.Values[i]) && !math.IsNaN(data.Values[i]) && tsj.Values[i] != data.Values[i] {
+			log.Printf("Index: %d:  %v != %v", i, tsj.Values[i], data.Values[i])
 			flag = false
 		}
 	}

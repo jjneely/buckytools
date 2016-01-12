@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 	"strconv"
 	"time"
 )
+
+import "github.com/golang/protobuf/proto"
 
 import "github.com/jjneely/buckytools/metrics"
 import "github.com/jjneely/journal/timeseries"
@@ -83,12 +84,12 @@ func getTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 	}
 
 	// Marshal the data back as a JSON blob
-	blob, err := json.Marshal(ret)
+	blob, err := proto.Marshal(ret)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("Error marshaling data: %s", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/protobuf")
 		w.Write(blob)
 	}
 }
@@ -99,8 +100,8 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 	path := metrics.MetricToPath(metric, ".tsj")
 
 	// Does this request look sane?
-	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, "Accepted Content-Type: application/json",
+	if r.Header.Get("Content-Type") != "application/protobuf" {
+		http.Error(w, "Accepted Content-Type: application/prtobuf",
 			http.StatusBadRequest)
 		log.Printf("postTimeSeries: content-type of %s, abort!",
 			r.Header.Get("Content-Type"))
@@ -108,14 +109,13 @@ func postTimeSeries(w http.ResponseWriter, r *http.Request, metric string) {
 	}
 
 	blob, err := ioutil.ReadAll(r.Body)
-	log.Printf("Body: %v", string(blob[:256]))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("Error reading body in postTimeSeries: %s", err)
 		return
 	}
 	ts := new(metrics.TimeSeries)
-	err = json.Unmarshal(blob, ts)
+	err = proto.Unmarshal(blob, ts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		log.Printf("Error unmarshalling json: %s", err)

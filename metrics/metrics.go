@@ -4,13 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,16 +16,6 @@ import (
 
 import "github.com/jjneely/journal/timeseries"
 import "github.com/jjneely/journal"
-
-// TimeSeries is the in memory and transit representation of time series
-// data.
-type TimeSeries struct {
-	Epoch    int64            `json: epoch`
-	Interval int64            `json: interval`
-	Values   []MarshalFloat64 `json: values`
-}
-
-type MarshalFloat64 float64
 
 type MetricsCacheType struct {
 	metrics   []string
@@ -46,28 +34,6 @@ func init() {
 		"The root of the whisper database store.")
 }
 
-func (f MarshalFloat64) XXXUnmarshalJSON(buf []byte) error {
-	var err error
-	var v float64
-
-	if string(buf) == "null" {
-		f = MarshalFloat64(math.NaN())
-	} else {
-		v, err = strconv.ParseFloat(string(buf), 64)
-		f = MarshalFloat64(v)
-	}
-	//log.Printf("Unmarshaled: %v", f)
-	return err
-}
-
-func (f MarshalFloat64) MarshalJSON() ([]byte, error) {
-	if math.IsNaN(float64(f)) {
-		f = 0
-	}
-	ret := []byte(strconv.FormatFloat(float64(f), 'E', -1, 64))
-	return ret, nil
-}
-
 // JournalFetch is a convienance wrapper around reading from timeseries
 // journals
 func JournalFetch(j timeseries.Journal, from, until int64) (*TimeSeries, error) {
@@ -84,10 +50,7 @@ func JournalFetch(j timeseries.Journal, from, until int64) (*TimeSeries, error) 
 	ret := new(TimeSeries)
 	ret.Epoch = from - (from % j.Interval())
 	ret.Interval = j.Interval()
-	ret.Values = make([]MarshalFloat64, 0)
-	for _, f := range []float64(values.(journal.Float64Values)) {
-		ret.Values = append(ret.Values, MarshalFloat64(f))
-	}
+	ret.Values = []float64(values.(journal.Float64Values))
 
 	return ret, nil
 }
