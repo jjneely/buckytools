@@ -229,6 +229,9 @@ func validateRetentions(retentions Retentions) error {
 */
 func Open(path string) (whisper *Whisper, err error) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
+	if os.IsPermission(err) {
+		file, err = os.OpenFile(path, os.O_RDONLY, 0666)
+	}
 	if err != nil {
 		return nil, err
 	}
