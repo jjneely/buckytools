@@ -21,6 +21,7 @@ func runCarbonServer(bind string) {
 	cache := runCache()
 	carbon := carbonServer(bind)
 
+	// carbon is closed when signals are recieved
 	for m := range carbon {
 		cache <- m
 	}
@@ -79,7 +80,7 @@ func handleCarbon(conn net.Conn, c chan *TimeSeriesPoint) {
 	for {
 		n, err := conn.Read(buf[offset:])
 		if n > 0 {
-			lines := bytes.Split(buf[:n], []byte{'\n'})
+			lines := bytes.Split(buf[:n+offset], []byte{'\n'})
 			last := len(lines) - 1
 			for i, line := range lines {
 				if i == last && err != io.EOF {
@@ -94,6 +95,7 @@ func handleCarbon(conn net.Conn, c chan *TimeSeriesPoint) {
 			}
 		}
 		if err == io.EOF {
+			log.Printf("Client closed connection")
 			return
 		}
 		if err != nil {
@@ -112,28 +114,33 @@ func parseCarbonLine(buf []byte) *TimeSeriesPoint {
 
 	fields := bytes.Split(buf, []byte{' '})
 	if len(fields) != 3 {
-		log.Printf("Illegal metric: %s", string(buf))
+		log.Printf("Illegal protocol line: %s", string(buf))
 		return nil
 	}
-
 	dp := new(TimeSeriesPoint)
+
+	// Metric Name
 	dp.Metric = string(fields[0])
-	i, err = strconv.ParseInt(string(fields[1]), 10, 64)
+
+	// Metric Value
+	f, err = strconv.ParseFloat(string(fields[1]), 64)
+	if err != nil {
+		log.Printf("Illegal protocol line: %s", string(buf))
+		return nil
+	}
+	dp.Value = f
+
+	// Metric Timestamp
+	i, err = strconv.ParseInt(string(fields[2]), 10, 64)
 	if err != nil {
 		f, err = strconv.ParseFloat(string(fields[1]), 64)
 		i = int64(f)
 	}
 	if err != nil {
-		log.Printf("Illegal metric: %s", string(buf))
+		log.Printf("Illegal protocol line: %s", string(buf))
 		return nil
 	}
 	dp.Timestamp = i
-	f, err = strconv.ParseFloat(string(fields[2]), 64)
-	if err != nil {
-		log.Printf("Illegal metric: %s", string(buf))
-		return nil
-	}
-	dp.Value = f
 
 	return dp
 }

@@ -21,7 +21,7 @@ const (
 
 	// EVICT_TIME is the number of milliseconds to wait before running a
 	// cache eviction after receiving a metric.
-	EVICT_TIME = 500
+	EVICT_TIME = 250
 )
 
 // CacheHeap is a Heap object that forms a priority queue to manage
@@ -38,6 +38,12 @@ type CacheItem struct {
 	ts     *metrics.TimeSeries // Epoch, Interval, Values
 }
 
+// cache is our global heap / priority queue for persisting metrics to disk
+var cache CacheHeap
+
+// search is out global ordered search list for finding metrics in the cache
+var search CacheStore
+
 func (c CacheStore) Len() int {
 	return len(c)
 }
@@ -52,7 +58,7 @@ func (c CacheStore) Less(i, j int) bool {
 
 // Search performs a binary search over the CacheStore to locate a metric.
 func (c CacheStore) Search(metric string) int {
-	cmp := func(i int) bool { return c[i].metric < metric }
+	cmp := func(i int) bool { return c[i].metric >= metric }
 	return sort.Search(c.Len(), cmp)
 }
 
@@ -62,6 +68,8 @@ func (c CacheHeap) Len() int {
 
 func (c CacheHeap) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
+	c[i].index = i
+	c[j].index = j
 }
 
 func (c CacheHeap) Less(i, j int) bool {
@@ -89,7 +97,7 @@ func (c *CacheHeap) Pop() interface{} {
 func (c *CacheHeap) update(item *CacheItem, dp *TimeSeriesPoint) {
 	// Adjust timestamp for regular intervals
 	timestamp := dp.Timestamp - (dp.Timestamp % item.ts.Interval)
-	i := (item.ts.Epoch - timestamp) % item.ts.Interval
+	i := (timestamp - item.ts.Epoch) / item.ts.Interval
 	length := int64(len(item.ts.Values)) // do casting only once
 
 	switch {
@@ -139,33 +147,39 @@ func runCache() chan *TimeSeriesPoint {
 	var timerCh <-chan time.Time
 
 	// Data structures and resulting channel
-	// XXX: cache/search need to be global or shared via reference better
 	c := make(chan *TimeSeriesPoint)
-	cache := make(CacheHeap, 0)
-	search := make(CacheStore, 0)
+	cache = make(CacheHeap, 0)
+	search = make(CacheStore, 0)
 	heap.Init(&cache)
 
+	// close c to stop processing metrics
 	go func() {
-		defer close(c)
-		defer evictAll(search, cache)
+		defer evictAll()
 		for {
 			select {
+			case <-timerCh:
+				if len(cache) == 0 {
+					timerCh = nil
+				} else {
+					evictItem()
+					timer.Reset(EVICT_TIME * time.Millisecond)
+				}
 			case m, ok := <-c:
 				if !ok {
 					// channel closed
 					return
 				}
-				updateCache(m, search, cache)
-				if timerCh == nil {
+				updateCache(m)
+
+				// We block processing new metrics if our cache is full
+				for len(cache) > limit || len(cache[len(cache)-1].ts.Values) > limit {
+					evictItem()
+				}
+
+				// Setup timer to purge cache
+				if timerCh == nil && len(cache) > 0 {
 					timer.Reset(EVICT_TIME * time.Millisecond)
 					timerCh = timer.C
-				}
-			case <-timerCh:
-				evictItem(search, cache)
-				timerCh = nil
-				i := len(cache)
-				for i > 0 && (i > limit || len(cache[i-1].ts.Values) > limit) {
-					evictItem(search, cache)
 				}
 			}
 		}
@@ -174,7 +188,8 @@ func runCache() chan *TimeSeriesPoint {
 	return c
 }
 
-func updateCache(m *TimeSeriesPoint, search CacheStore, cache CacheHeap) {
+func updateCache(m *TimeSeriesPoint) {
+	log.Printf("Updating heap: '%s' %v %v", m.Metric, m.Value, m.Timestamp)
 	i := search.Search(m.Metric)
 	switch {
 	case i == search.Len():
@@ -192,11 +207,17 @@ func updateCache(m *TimeSeriesPoint, search CacheStore, cache CacheHeap) {
 	}
 }
 
-func evictItem(search CacheStore, cache CacheHeap) {
+func evictItem() {
 	// XXX: If this fails it tosses metrics on the floor
 	item := heap.Pop(&cache).(*CacheItem)
+	log.Printf("Evict: '%s' with %d values", item.metric, len(item.ts.Values))
 	i := search.Search(item.metric)
-	copy(search[i:], search[i+1:])
+	search[i] = nil
+	if len(search) > 1 {
+		search = append(search[:i], search[i+1:]...)
+	} else {
+		search = search[0:0]
+	}
 
 	path := metrics.MetricToPath(item.metric, ".tsj")
 	j, err := timeseries.Open(path)
@@ -213,13 +234,14 @@ func evictItem(search CacheStore, cache CacheHeap) {
 	err = metrics.JournalUpdate(j, item.ts)
 	if err != nil {
 		log.Printf("Error updating journal: %s", err)
+		log.Printf("Journal: Epoch %d; Int: %d; Last: %d", j.Epoch(), j.Interval(), j.Last())
+		log.Printf("TimeSeries: Epoch: %d; Int: %d; Values: %d", item.ts.Epoch, item.ts.Interval, len(item.ts.Values))
 		return
 	}
 }
 
-func evictAll(search CacheStore, cache CacheHeap) {
-	// XXX: If this fails it tosses metrics on the floor
+func evictAll() {
 	for cache.Len() > 0 {
-		evictItem(search, cache)
+		evictItem()
 	}
 }
