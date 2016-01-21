@@ -183,21 +183,21 @@ func updateCache(m *TimeSeriesPoint, search CacheStore, cache CacheHeap) {
 	case i == search.Len():
 		item := newCacheItem(m)
 		search = append(search, item)
-		heap.Push(cache, item)
+		heap.Push(&cache, item)
 	case search[i].metric == m.Metric:
 		cache.update(search[i], m)
-	case search[i] != m.Metric:
+	case search[i].metric != m.Metric:
 		item := newCacheItem(m)
 		search = append(search, nil)
 		copy(search[i+1:], search[i:])
 		search[i] = item
-		heap.Push(cache, item)
+		heap.Push(&cache, item)
 	}
 }
 
 func evictItem(search CacheStore, cache CacheHeap) {
 	// XXX: If this fails it tosses metrics on the floor
-	item := heap.Pop(cache).(*CacheItem)
+	item := heap.Pop(&cache).(*CacheItem)
 	i := search.Search(item.metric)
 	copy(search[i:], search[i+1:])
 
