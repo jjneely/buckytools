@@ -5,7 +5,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"strconv"
+	"time"
 )
 
 type TimeSeriesPoint struct {
@@ -16,7 +19,7 @@ type TimeSeriesPoint struct {
 
 func runCarbonServer(bind string) {
 	cache := runCache()
-	carbon := carbonServer(bind, stop)
+	carbon := carbonServer(bind)
 
 	for m := range carbon {
 		cache <- m
@@ -28,7 +31,11 @@ func runCarbonServer(bind string) {
 func carbonServer(bind string) chan *TimeSeriesPoint {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
-	ln, err := net.Listen("tcp", bind)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", bind)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ln, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		log.Fatalf("Error listening for TCP carbon connections: %s", err)
 	}

@@ -2,10 +2,12 @@ package main
 
 import (
 	"container/heap"
-	//"log"
+	"log"
 	"math"
 	"os"
+	"os/signal"
 	"sort"
+	"time"
 )
 
 import "github.com/jjneely/buckytools/metrics"
@@ -17,6 +19,10 @@ const (
 	// that we will store in the internal cache.  This should create a 1G
 	// cache.
 	MAX_CACHE = 1024 * 1024 * 1024 / 8
+
+	// EVICT_TIME is the number of milliseconds to wait before running a
+	// cache eviction after receiving a metric.
+	EVICT_TIME = 500
 )
 
 // CacheHeap is a Heap object that forms a priority queue to manage
@@ -115,7 +121,7 @@ func (c *CacheHeap) update(item *CacheItem, dp *TimeSeriesPoint) {
 
 func newCacheItem(metric *TimeSeriesPoint) *CacheItem {
 	c := new(CacheItem)
-	ts := new(metric.TimeSeries)
+	ts := new(metrics.TimeSeries)
 
 	ts.Epoch = metric.Timestamp
 	ts.Interval = 60 // XXX: Figure out schema
@@ -128,6 +134,16 @@ func newCacheItem(metric *TimeSeriesPoint) *CacheItem {
 }
 
 func runCache() chan *TimeSeriesPoint {
+	// Signal handling
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+
+	// Limits on data in cache
+	timer := time.NewTimer(0)
+	limit := int(math.Sqrt(MAX_CACHE))
+	var timerCh <-chan time.Time
+
+	// Data structures and resulting channel
 	c := make(chan *TimeSeriesPoint)
 	cache := make(CacheHeap, 0)
 	search := make(CacheStore, 0)
@@ -135,48 +151,60 @@ func runCache() chan *TimeSeriesPoint {
 
 	go func() {
 		defer close(c)
-		for m := range c {
-			i := search.Search(m.Metric)
-			switch {
-			case i == search.Len():
-				item := newCacheItem(m)
-				search = append(search, item)
-				heap.Push(cache, item)
-			case search[i].metric == m.Metric:
-				cache.update(search[i], m)
-			case search[i] != m.Metric:
-				item := newCacheItem(m)
-				search = append(search, nil)
-				copy(search[i+1:], search[i:])
-				search[i] = item
-				heap.Push(cache, item)
+		defer evictAll(search, cache)
+		for {
+			select {
+			case m := <-c:
+				updateCache(m, search, cache)
+				if timerCh == nil {
+					timer.Reset(EVICT_TIME * time.Millisecond)
+					timerCh = timer.C
+				}
+			case <-timerCh:
+				evictItem(search, cache)
+				timerCh = nil
+				i := len(cache)
+				for i > 0 && (i > limit || len(cache[i-1].ts.Values) > limit) {
+					evictItem(search, cache)
+				}
+			case <-sig:
+				return
 			}
-			if len(cache[len(cache)-1].ts.Values) > int(math.Sqrt(MAX_CACHE)) {
-				item = heap.Pop(cache)
-				i = search.Search(item.metric)
-				copy(search[i:], search[i+1:])
-				evictItem(item)
-			}
-			if cache.Len() > int(math.Sqrt(MAX_CACHE)) {
-				item = heap.Pop(cache)
-				i = search.Search(item.metric)
-				copy(search[i:], search[i+1:])
-				evictItem(item)
-			}
-		}
 
-		evictAll(cache)
+		}
 	}()
 
 	return c
 }
 
-func evictItem(item *CacheItem) {
+func updateCache(m *TimeSeriesPoint, search CacheStore, cache CacheHeap) {
+	i := search.Search(m.Metric)
+	switch {
+	case i == search.Len():
+		item := newCacheItem(m)
+		search = append(search, item)
+		heap.Push(cache, item)
+	case search[i].metric == m.Metric:
+		cache.update(search[i], m)
+	case search[i] != m.Metric:
+		item := newCacheItem(m)
+		search = append(search, nil)
+		copy(search[i+1:], search[i:])
+		search[i] = item
+		heap.Push(cache, item)
+	}
+}
+
+func evictItem(search CacheStore, cache CacheHeap) {
 	// XXX: If this fails it tosses metrics on the floor
+	item := heap.Pop(cache).(*CacheItem)
+	i := search.Search(item.metric)
+	copy(search[i:], search[i+1:])
+
 	path := metrics.MetricToPath(item.metric, ".tsj")
 	j, err := timeseries.Open(path)
 	if os.IsNotExist(err) {
-		j, err = timeseries.Create(path, ts.Interval,
+		j, err = timeseries.Create(path, item.ts.Interval,
 			journal.NewFloat64ValueType(), make([]int64, 0))
 	}
 	if err != nil {
@@ -192,10 +220,9 @@ func evictItem(item *CacheItem) {
 	}
 }
 
-func evictAll(cache CacheHeap) {
+func evictAll(search CacheStore, cache CacheHeap) {
 	// XXX: If this fails it tosses metrics on the floor
 	for cache.Len() > 0 {
-		item = heap.Pop(cache).(*CacheItem)
-		evictItem(item)
+		evictItem(search, cache)
 	}
 }
