@@ -89,6 +89,7 @@ func main() {
 	var replicas int
 	var hashType string
 	var bindAddress string
+	var graphiteBind string
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "UNKNOWN"
@@ -111,6 +112,8 @@ func main() {
 		fmt.Sprintf("Consistent Hash algorithm to use: %v", SupportedHashTypes))
 	flag.IntVar(&replicas, "replicas", 1,
 		"Number of copies of each metric in the cluster.")
+	flag.StringVar(&graphiteBind, "graphite", "",
+		"Run a Graphite line protocol server at the given bind address:port")
 	flag.Parse()
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)
@@ -126,6 +129,10 @@ func main() {
 	http.HandleFunc("/hashring", listHashring)
 	http.HandleFunc("/timeseries/", serveTimeSeries)
 
+	if graphiteBind != "" {
+		log.Printf("Starting Graphite server on %s", graphiteBind)
+		go runCarbonServer(graphiteBind)
+	}
 	log.Printf("Starting server on %s", bindAddress)
 	err = http.ListenAndServe(bindAddress, nil)
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"os/signal"
 	"sort"
 	"time"
 )
@@ -134,16 +133,13 @@ func newCacheItem(metric *TimeSeriesPoint) *CacheItem {
 }
 
 func runCache() chan *TimeSeriesPoint {
-	// Signal handling
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, os.Kill)
-
 	// Limits on data in cache
 	timer := time.NewTimer(0)
 	limit := int(math.Sqrt(MAX_CACHE))
 	var timerCh <-chan time.Time
 
 	// Data structures and resulting channel
+	// XXX: cache/search need to be global or shared via reference better
 	c := make(chan *TimeSeriesPoint)
 	cache := make(CacheHeap, 0)
 	search := make(CacheStore, 0)
@@ -154,7 +150,11 @@ func runCache() chan *TimeSeriesPoint {
 		defer evictAll(search, cache)
 		for {
 			select {
-			case m := <-c:
+			case m, ok := <-c:
+				if !ok {
+					// channel closed
+					return
+				}
 				updateCache(m, search, cache)
 				if timerCh == nil {
 					timer.Reset(EVICT_TIME * time.Millisecond)
@@ -167,10 +167,7 @@ func runCache() chan *TimeSeriesPoint {
 				for i > 0 && (i > limit || len(cache[i-1].ts.Values) > limit) {
 					evictItem(search, cache)
 				}
-			case <-sig:
-				return
 			}
-
 		}
 	}()
 

@@ -24,6 +24,7 @@ func runCarbonServer(bind string) {
 	for m := range carbon {
 		cache <- m
 	}
+	close(cache)
 }
 
 // carbonServer starts a TCP listener and handles incoming Graphite line
