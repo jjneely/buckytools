@@ -127,6 +127,11 @@ func RestoreTar(servers []string, fd *os.File) error {
 			log.Printf("Error reading tar archive: %s", err)
 			return err
 		}
+		if hdr.Typeflag != tar.TypeReg || hdr.Typeflag != tar.TypeGNUSparse {
+			// A non-normal file, probably directory
+			continue
+		}
+
 		buf := new(bytes.Buffer)
 		metric := new(MetricData)
 		metric.Name = metrics.RelativeToMetric(filepath.Join(tarPrefix, hdr.Name))
