@@ -199,48 +199,35 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		dstExists = false
 	}
 
-	// Write request body to a tmpfile
-	fd, err := ioutil.TempFile(tmpDir, "buckyd")
-	if err != nil {
-		log.Printf("Error creating temp file: %s", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	_, err = io.Copy(fd, r.Body)
-	if err != nil {
-		log.Printf("Error writing to temp file: %s", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		fd.Close()
-		os.Remove(fd.Name())
-		return
-	}
-	srcName := fd.Name()
-	fd.Sync()
-	fd.Close()
-	defer os.Remove(srcName) // not concerned with errors here
-
-	// XXX: How can we check the tmpfile for sanity?
 	if dstExists {
-		err := fill.All(srcName, path)
+		// Write request body to a tmpfile
+		fd, err := ioutil.TempFile(tmpDir, "buckyd")
+		if err != nil {
+			log.Printf("Error creating temp file: %s", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, err = io.Copy(fd, r.Body)
+		if err != nil {
+			log.Printf("Error writing to temp file: %s", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fd.Close()
+			os.Remove(fd.Name())
+			return
+		}
+		srcName := fd.Name()
+		fd.Close()
+		defer os.Remove(srcName) // not concerned with errors here
+
+		// XXX: How can we check the tmpfile for sanity?
+		err = fill.All(srcName, path)
 		if err != nil {
 			log.Printf("Error backfilling %s => %s: %s", srcName, path, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	} else {
-		src, err := os.Open(srcName)
-		if err != nil {
-			log.Printf("Error opening tmp file %s: %s", srcName, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer src.Close()
-		if err = syscall.Flock(int(src.Fd()), syscall.LOCK_EX); err != nil {
-			log.Printf("Error locking file %s: %s", srcName, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
+		// Open and lock destination
 		dst, err := os.Create(path)
 		if err != nil {
 			log.Printf("Error opening metric file %s: %s", path, err)
@@ -254,14 +241,17 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 
-		_, err = io.Copy(dst, src)
+		if sparseFiles {
+			_, err = copySparse(dst, r.Body)
+		} else {
+			_, err = io.Copy(dst, r.Body)
+		}
 		if err != nil {
-			log.Printf("Error copying %s => %s: %s", srcName, path, err)
+			log.Printf("Error copying request body to %s: %s", path, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
-
 }
 
 // serveMetric will serve a GET request for the metric that path
