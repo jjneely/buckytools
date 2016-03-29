@@ -72,10 +72,9 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "The first argument must be the network location to forward\n")
 	fmt.Fprintf(os.Stderr, "plaintext carbon metrics to.\n\n")
 	flag.PrintDefaults()
-	os.Exit(1)
 }
 
-func serveForever() chan []string {
+func serveForever() chan []byte {
 	log.Printf("Starting bucky-pickle-relay on %s", bindTo)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", bindTo)
 	if err != nil {
@@ -92,7 +91,7 @@ func serveForever() chan []string {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 
-	c := make(chan []string, pickleQueueSize)
+	c := make(chan []byte, pickleQueueSize)
 
 	go func() {
 		defer close(c)
@@ -130,16 +129,16 @@ func serveForever() chan []string {
 
 // reportMetrics adds internal metrics to the data stream, by adding a magic
 // number to the byte slice that we look for to distinguish pickles.
-func reportMetrics(c chan []string) {
+func reportMetrics(c chan []byte) {
+	buf := new(bytes.Buffer)
 	timestamp := time.Now().Unix()
-	format := "%s%s %d %d"
-	m := make([]string, 3)
+	format := "%s%s %d %d\n"
 
-	m[0] = fmt.Sprintf(format, prefix, ".seenPickles", seenPickles, timestamp)
-	m[1] = fmt.Sprintf(format, prefix, ".seenMetrics", seenMetrics, timestamp)
-	m[2] = fmt.Sprintf(format, prefix, ".sentMetrics", sentMetrics, timestamp)
+	fmt.Fprintf(buf, format, prefix, ".seenPickles", seenPickles, timestamp)
+	fmt.Fprintf(buf, format, prefix, ".seenMetrics", seenMetrics, timestamp)
+	fmt.Fprintf(buf, format, prefix, ".sentMetrics", sentMetrics, timestamp)
 
-	c <- m
+	c <- buf.Bytes()
 }
 
 func readSlice(conn net.Conn, buf []byte) error {
@@ -154,7 +153,7 @@ func readSlice(conn net.Conn, buf []byte) error {
 	return nil
 }
 
-func handleConn(c chan []string, conn net.Conn) {
+func handleConn(c chan []byte, conn net.Conn) {
 	if debug {
 		log.Printf("Connection from %s", conn.RemoteAddr().String())
 	}
@@ -208,21 +207,19 @@ func handleConn(c chan []string, conn net.Conn) {
 			return
 		}
 
+		// XXX: Updating global variables in a multi-thread go routine
+		// how could this go wrong? (seenPickles, seenMetrics)
 		seenPickles++
 		metrics := decodePickle(dataBuf)
-		if debug {
-			for i := range metrics {
-				log.Printf("Found Metric: %s", metrics[i])
-			}
-		}
+		seenMetrics = seenMetrics + bytes.Count(metrics, []byte{'\n'})
 		if metrics != nil && len(metrics) > 0 {
 			c <- metrics
 		}
 	}
 }
 
-func decodePickle(buff []byte) []string {
-	metrics := make([]string, 0)
+func decodePickle(buff []byte) []byte {
+	metrics := new(bytes.Buffer)
 
 	decoder := pickle.NewDecoder(bytes.NewBuffer(buff))
 	object, err := decoder.Decode()
@@ -250,6 +247,9 @@ func decodePickle(buff []byte) []string {
 		if !ok {
 			log.Printf("Dropping metric: Unexpected %T type where metric key string should be", metric[0])
 			continue
+		}
+		if debug {
+			log.Printf("Found Metric: %s", key)
 		}
 
 		datatuple, ok := metric[1].([]interface{})
@@ -286,26 +286,29 @@ func decodePickle(buff []byte) []string {
 			dp = fmt.Sprintf("%d", t)
 		}
 
-		metrics = append(metrics, fmt.Sprintf("%s %s %s", key, dp, ts))
+		fmt.Fprintf(metrics, "%s %s %s\n", key, dp, ts)
 	}
 
-	seenMetrics = seenMetrics + len(metrics)
-	return metrics
+	return metrics.Bytes()
 }
 
-// plainTextBatch take a slice of individual plaintext metric strings
-// and returns a slice of strings with several metrics concatenated
-// together with a newline separator.  This helps us send fewer larger
-// packets to our target.
-func plainTextBatch(metrics []string, size int) []string {
-	var i int
-	ret := make([]string, 0)
+// plainTextBatch take a slice of plaintext metric strings
+// and returns a slice of byte slices with metrics batched together and
+// separated by newlines with the max batch size set with the size parameter.
+func plainTextBatch(metrics []byte, size int) [][]byte {
+	var i, c, off int
+	ret := make([][]byte, 0)
 
-	for i = 0; i < len(metrics)-size; i = i + size {
-		ret = append(ret, strings.Join(metrics[i:i+size], "\n"))
+	for i = 0; i < len(metrics); i++ {
+		if metrics[i] == '\n' {
+			c++
+		}
+		if c == size || i == len(metrics)-1 {
+			ret = append(ret, metrics[off:i+1])
+			off = i + 1
+		}
 	}
 
-	ret = append(ret, strings.Join(metrics[i:], "\n"))
 	return ret
 }
 
@@ -335,8 +338,9 @@ func getRelayConnection() net.Conn {
 	return nil
 }
 
-func plainTextOut(metrics <-chan []string) {
-	var batch []string
+func plainTextOut(metrics <-chan []byte) {
+	var batch [][]byte
+	sep := []byte{'\n'}
 	conn := getRelayConnection()
 
 	for slice := range metrics {
@@ -347,12 +351,12 @@ func plainTextOut(metrics <-chan []string) {
 			// we are talking to localhost we should probably put this in the
 			// outer for loop...or do we really need it at all?
 			// conn.SetDeadline(time.Now().Add(time.Second * time.Duration(sendTimeout)))
-			_, err := conn.Write([]byte(batch[0] + "\n"))
+			_, err := conn.Write([]byte(batch[0]))
 			// XXX: Do we need to check for short writes?
 
 			if err == nil {
 				// On success we get the next batch
-				sentMetrics = sentMetrics + strings.Count(batch[0], "\n") + 1
+				sentMetrics = sentMetrics + bytes.Count(batch[0], sep)
 				batch = batch[1:]
 			} else {
 				// next write will write the current batch again
@@ -370,6 +374,7 @@ func main() {
 		hostname = "unknown"
 	}
 
+	flag.Usage = usage
 	flag.StringVar(&prefix, "p", fmt.Sprintf("bucky-pickle-relay.%s", hostname),
 		"Prefix for internally generated metrics.")
 	flag.StringVar(&bindTo, "b", ":2004",
@@ -389,6 +394,7 @@ func main() {
 	flag.Parse()
 	if flag.NArg() != 1 {
 		usage()
+		os.Exit(1)
 	}
 
 	log.Printf("bucky-pickle-relay Copyright 2015 42 Lines, Inc.")
