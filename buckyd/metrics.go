@@ -125,7 +125,8 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 func statMetric(w http.ResponseWriter, metric, path string) (time.Time, error) {
 	s, err := os.Stat(path)
 	if err != nil {
-		return s.ModTime(), err
+		// Time is useless here -- use the zero value
+		return time.Time{}, err
 	}
 
 	stat := new(MetricStatType)
