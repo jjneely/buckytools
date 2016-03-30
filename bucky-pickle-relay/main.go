@@ -169,13 +169,17 @@ func handleConn(c chan []string, conn net.Conn) {
 		// Pickle is preceded by an unsigned long integer of 4 bytes (!L)
 		err := readSlice(conn, sizeBuf)
 		if err == io.EOF {
-			// Remote end closed connection
+			if debug {
+				log.Printf("Normal connection close from %s", conn.RemoteAddr().String())
+			}
 			return
 		} else if neterr, ok := err.(*net.OpError); ok && strings.Contains(neterr.Error(), "connection reset by peer") {
-			// XXX: This used to work in Go 1.4 neterr.Err == syscall.ECONNRESET
 			// Connection reset by peer between Pickles
 			// or TCP probe health check
 			// at this point in the proto we ignore
+			if debug {
+				log.Printf("Connection reset: %s", conn.RemoteAddr().String())
+			}
 			return
 		} else if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 			// Timeout waiting for data on connection
@@ -206,6 +210,11 @@ func handleConn(c chan []string, conn net.Conn) {
 
 		seenPickles++
 		metrics := decodePickle(dataBuf)
+		if debug {
+			for i := range metrics {
+				log.Printf("Found Metric: %s", metrics[i])
+			}
+		}
 		if metrics != nil && len(metrics) > 0 {
 			c <- metrics
 		}
