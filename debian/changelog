@@ -1,3 +1,13 @@
+buckytools (0.1.7-1) unstable; urgency=medium
+
+  * bucky restore: handle non-regular files in tarball
+  * buckdy: fix panic when we error on stat() and attempt to access
+    the stat's returned value
+  * buckyd: Support sparse files
+  * bucky-pickle-relay: additional logging
+
+ -- Jack Neely <jjneely@42lines.net>  Wed, 30 Mar 2016 12:24:32 -0400
+
 buckytools (0.1.6-1) unstable; urgency=medium
 
   * bucky-pickle-relay logging fixes
