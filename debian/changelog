@@ -1,3 +1,9 @@
+buckytools (0.1.8-1) unstable; urgency=medium
+
+  * Packaging work, vendoring in new dependancies
+
+ -- Jack Neely <jjneely@42lines.net>  Wed, 30 Mar 2016 14:42:28 -0400
+
 buckytools (0.1.7-1) unstable; urgency=medium
 
   * bucky restore: handle non-regular files in tarball
