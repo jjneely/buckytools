@@ -142,7 +142,7 @@ func reportMetrics(c chan []string) {
 	m[1] = fmt.Sprintf(format, prefix, ".seenMetrics", seenMetrics, timestamp)
 	m[2] = fmt.Sprintf(format, prefix, ".sentMetrics", sentMetrics, timestamp)
 	m[3] = fmt.Sprintf(format, prefix, ".queueLength", len(c), timestamp)
-	m[4] = fmt.Sprintf(format, prefix, ".TotalAlloc", mem.TotalAlloc, timestamp)
+	m[4] = fmt.Sprintf(format, prefix, ".systemMemory", mem.Sys, timestamp)
 
 	c <- m
 }
