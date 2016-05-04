@@ -68,6 +68,7 @@ These are the tools included and their functionality.
     names and dump it in tar format to STDOUT.
 * **gentestmetrics** -- Command that generates random Graphite style metrics
   to stdout purely for testing.
+* **bucky-sparsify** -- Rewrites `.wsp` files into sparse files.
 
 The heavy lifting commands use a set of worker threads to do IO work
 which can be set at the command line with -w.
