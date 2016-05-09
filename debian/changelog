@@ -1,3 +1,9 @@
+buckytools (0.1.9) unstable; urgency=medium
+
+  * bucky-sparsify
+
+ -- Jack Neely <jjneely@42lines.net>  Wed, 04 May 2016 14:53:50 -0400
+
 buckytools (0.1.8-1) unstable; urgency=medium
 
   * Packaging work, vendoring in new dependancies
