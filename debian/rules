@@ -5,9 +5,14 @@
 #export DH_VERBOSE=1
 export GO15VENDOREXPERIMENT := 1
 export DH_OPTIONS
-
 export DH_GOPKG := github.com/jjneely/buckytools
+
+DEBPKGNAME ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Source: //p')
 
 %:
 	dh $@ --buildsystem=golang --with=golang
 
+override_dh_auto_install:
+	dh_auto_install
+	# we don't want the golang source (yet?)
+	rm -r debian/$(DEBPKGNAME)/usr/share/gocode
