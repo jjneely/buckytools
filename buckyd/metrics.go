@@ -36,6 +36,11 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 	// the body of 10MiB which may be small for the amount of JSON data
 	// included in a list command.  Set the limit higher here.  How
 	// can we do this better?  This is 160MiB.
+	if r.ContentLength >= 10<<24 {
+		// Query is too big, give the user an error
+		http.Error(w, "Query larger than 160MiB", http.StatusBadRequest)
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<24)
 
 	// Handle case when we are currently building the cache
