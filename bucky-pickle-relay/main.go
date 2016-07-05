@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -131,13 +132,17 @@ func serveForever() chan []string {
 // reportMetrics adds internal metrics to the data stream, by adding a magic
 // number to the byte slice that we look for to distinguish pickles.
 func reportMetrics(c chan []string) {
+	mem := new(runtime.MemStats)
+	runtime.ReadMemStats(mem)
 	timestamp := time.Now().Unix()
 	format := "%s%s %d %d"
-	m := make([]string, 3)
+	m := make([]string, 5)
 
 	m[0] = fmt.Sprintf(format, prefix, ".seenPickles", seenPickles, timestamp)
 	m[1] = fmt.Sprintf(format, prefix, ".seenMetrics", seenMetrics, timestamp)
 	m[2] = fmt.Sprintf(format, prefix, ".sentMetrics", sentMetrics, timestamp)
+	m[3] = fmt.Sprintf(format, prefix, ".queueLength", len(c), timestamp)
+	m[4] = fmt.Sprintf(format, prefix, ".systemMemory", mem.Sys, timestamp)
 
 	c <- m
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -17,6 +16,9 @@ import "github.com/jjneely/buckytools/metrics"
 var metricsCache *metrics.MetricsCacheType
 var tmpDir string
 var hashring *JSONRingType
+
+// sparseFiles defines if we create and manage sparse files.
+var sparseFiles bool
 
 func usage() {
 	t := []string{
@@ -34,20 +36,6 @@ func usage() {
 
 	fmt.Printf(strings.Join(t, ""), os.Args[0], Version)
 	flag.PrintDefaults()
-}
-
-func logRequest(r *http.Request) {
-	log.Printf("%s - - %s %s", r.RemoteAddr, r.Method, r.RequestURI)
-}
-
-func unmarshalList(encoded string) ([]string, error) {
-	data := make([]string, 0)
-	err := json.Unmarshal([]byte(encoded), &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 // parseRing builds a representation of the hashring from the command
@@ -114,6 +102,9 @@ func main() {
 		"Number of copies of each metric in the cluster.")
 	flag.StringVar(&graphiteBind, "graphite", "",
 		"Run a Graphite line protocol server at the given bind address:port")
+	flag.BoolVar(&sparseFiles, "sparse", false,
+		"Be aware of sparse Whisper DB files.")
+
 	flag.Parse()
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)

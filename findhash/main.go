@@ -11,7 +11,7 @@ import (
 )
 
 import "github.com/jjneely/buckytools/hashing"
-import "code.google.com/p/go-uuid/uuid"
+import "github.com/pborman/uuid"
 
 func getConfig(file string) []string {
 	data, err := ioutil.ReadFile(file)
