@@ -200,6 +200,21 @@ func handleConn(c chan []string, conn net.Conn) {
 		if size > maxPickleSize {
 			log.Printf("%s attempting to send %d bytes and is too large, aborting",
 				conn.RemoteAddr(), size)
+			if debug {
+				// If plaintext line format data is sent in place of pickle format
+				// it will be interpreted as oversized pickle as the first 4 bytes of
+				// the metric (ASCII data) will be read in as the pickle size. 
+				// For debugging, grab the first 128 bites of the oversized pickle
+				// and log it. 
+				badPickleBuf := make([]byte, 128)
+				err = readSlice(conn, badPickleBuf)
+				if err != nil {
+					log.Printf("Error reading oversized pickle from %s: %s",
+						conn.RemoteAddr(), err)
+					return
+				}
+				log.Printf("Oversized pickle! size: %s, data: %s", sizeBuf, badPickleBuf)
+				}
 			return
 		}
 
