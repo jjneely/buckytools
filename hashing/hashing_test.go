@@ -94,12 +94,12 @@ func TestNewHashRing(t *testing.T) {
 
 	n := NewNode("a", "a")
 	hr.AddNode(n)
-	if hr.String() != "[HashRing: 1 nodes, 5 replicas, 5 ring members a:a]" {
+	if hr.String() != "[carbon: 1 nodes, 5 replicas, 5 ring members a:a]" {
 		t.Error("HashRing string representation or AddNode()")
 	}
 
 	hr.RemoveNode(n)
-	if hr.String() != "[HashRing: 0 nodes, 5 replicas, 0 ring members ]" {
+	if hr.String() != "[carbon: 0 nodes, 5 replicas, 0 ring members ]" {
 		t.Error("HashRing string representation or AddNode()")
 	}
 }
@@ -107,7 +107,7 @@ func TestNewHashRing(t *testing.T) {
 func TestGraphiteCompatible(t *testing.T) {
 	hr := makeRing()
 
-	repr := "[HashRing: 39 nodes, 100 replicas, 3900 ring members graphite010-g5:a graphite010-g5:b graphite010-g5:c graphite011-g5:a graphite011-g5:b graphite011-g5:c graphite012-g5:a graphite012-g5:b graphite012-g5:c graphite013-g5:a graphite013-g5:b graphite013-g5:c graphite014-g5:a graphite014-g5:b graphite014-g5:c graphite015-g5:a graphite015-g5:b graphite015-g5:c graphite016-g5:a graphite016-g5:b graphite016-g5:c graphite017-g5:a graphite017-g5:b graphite017-g5:c graphite018-g5:a graphite018-g5:b graphite018-g5:c graphite-data019-g5:a graphite-data019-g5:b graphite-data019-g5:c graphite-data020-g5:a graphite-data020-g5:b graphite-data020-g5:c graphite-data021-g5:a graphite-data021-g5:b graphite-data021-g5:c graphite-data022-g5:a graphite-data022-g5:b graphite-data022-g5:c]"
+	repr := "[carbon: 39 nodes, 100 replicas, 3900 ring members graphite010-g5:a graphite010-g5:b graphite010-g5:c graphite011-g5:a graphite011-g5:b graphite011-g5:c graphite012-g5:a graphite012-g5:b graphite012-g5:c graphite013-g5:a graphite013-g5:b graphite013-g5:c graphite014-g5:a graphite014-g5:b graphite014-g5:c graphite015-g5:a graphite015-g5:b graphite015-g5:c graphite016-g5:a graphite016-g5:b graphite016-g5:c graphite017-g5:a graphite017-g5:b graphite017-g5:c graphite018-g5:a graphite018-g5:b graphite018-g5:c graphite-data019-g5:a graphite-data019-g5:b graphite-data019-g5:c graphite-data020-g5:a graphite-data020-g5:b graphite-data020-g5:c graphite-data021-g5:a graphite-data021-g5:b graphite-data021-g5:c graphite-data022-g5:a graphite-data022-g5:b graphite-data022-g5:c]"
 
 	fmt.Printf("%s\n", hr)
 	if hr.String() != repr {
