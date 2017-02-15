@@ -45,7 +45,7 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 
 	// Handle case when we are currently building the cache
 	if r.FormValue("force") != "" && metricsCache.IsAvailable() {
-		metricsCache.RefreshCache()
+		go metricsCache.RefreshCache()
 	}
 	metrics, ok := metricsCache.GetMetrics()
 	if !ok {

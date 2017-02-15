@@ -73,9 +73,10 @@ func examine(path string, info os.FileInfo, err error) error {
 
 	if lastDP {
 		if len(ts) > 0 {
-			t := time.Unix(int64(ts[0].Time), 0).UTC().Format(time.RFC3339)
-			fmt.Printf("%s: Most recent DP: %s\t%.2f\n",
-				path, t, ts[0].Value)
+			i := len(ts) - 1
+			t := time.Unix(int64(ts[i].Time), 0).UTC().Format(time.RFC3339)
+			fmt.Printf("%s: Most recent DP: %d or %s\t%.2f\n",
+				path, ts[i].Time, t, ts[i].Value)
 		} else {
 			fmt.Printf("%s: No valid data points\n", path)
 		}
