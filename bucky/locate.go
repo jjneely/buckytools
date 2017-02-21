@@ -7,11 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 )
-
-import . "github.com/jjneely/buckytools"
-import "github.com/jjneely/buckytools/hashing"
 
 func init() {
 	usage := "[options] <metric list>"
@@ -35,36 +31,25 @@ calculating metric locations.`
 	SetupJSON(c)
 }
 
-func buildHashRing(rings []*JSONRingType) *hashing.HashRing {
-	hr := hashing.NewHashRing()
-	for _, n := range rings[0].Nodes {
-		// ports are already removed
-		fields := strings.Split(n, ":")
-		if len(fields) < 2 {
-			hr.AddNode(hashing.NewNode(fields[0], ""))
-		} else {
-			hr.AddNode(hashing.NewNode(fields[0], fields[1]))
-		}
-	}
-
-	return hr
-}
-
 // LocateSliceMetrics takes a slice of metric ken names and derives the location
 // of each metric in the cluster by using the consistent hash algorithm.  It
 // returns a map of metric => server.
 func LocateSliceMetrics(metrics []string) map[string]string {
-	rings := GetRings()
-	if !IsHealthy(rings) {
+	if !Cluster.Healthy {
 		log.Fatal("Cluster is inconsistent. Use the servers command to investigate.")
 	}
 
-	hr := buildHashRing(rings)
 	result := make(map[string]string)
+	spread := make(map[string]int)
 	for _, key := range metrics {
 		// XXX: we toss away instance info here due to our assumption that a
 		// graphite node has one whisper db store
-		result[key] = hr.GetNode(key).Server
+		result[key] = Cluster.Hash.GetNode(key).Server
+		spread[result[key]]++
+	}
+
+	for k, v := range spread {
+		log.Printf("%d metrics assigned to %s", v, k)
 	}
 
 	return result
@@ -85,6 +70,12 @@ func LocateJSONMetrics(fd io.Reader) map[string]string {
 
 // locateCommand runs this subcommand.
 func locateCommand(c Command) int {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
+		return 1
+	}
+
 	var list map[string]string
 	if c.Flag.NArg() == 0 {
 		log.Fatal("At least one argument is required.")

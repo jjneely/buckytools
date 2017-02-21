@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -14,7 +15,7 @@ import "github.com/jjneely/buckytools/metrics"
 
 var metricsCache *metrics.MetricsCacheType
 var tmpDir string
-var hashring JSONRingType
+var hashring *JSONRingType
 
 // sparseFiles defines if we create and manage sparse files.
 var sparseFiles bool
@@ -39,11 +40,15 @@ func usage() {
 
 // parseRing builds a representation of the hashring from the command
 // line arguments
-func parseRing() {
-	if flag.NArg() < 2 {
-		log.Fatalf("You must have at least 2 nodes in your hash ring.")
+func parseRing(hostname, algo string, replicas int) *JSONRingType {
+	if flag.NArg() < 1 {
+		log.Fatalf("You must have at least 1 node in your hash ring")
 	}
-	hashring.Nodes = make([]string, 0)
+	ring := new(JSONRingType)
+	ring.Nodes = make([]string, 0)
+	ring.Name = hostname
+	ring.Algo = algo
+	ring.Replicas = replicas
 	for i := 0; i < flag.NArg(); i++ {
 		var n string
 		switch strings.Count(flag.Arg(i), ":") {
@@ -62,11 +67,15 @@ func parseRing() {
 			log.Fatalf("Error parsing hashring members from cli.")
 		}
 
-		hashring.Nodes = append(hashring.Nodes, n)
+		ring.Nodes = append(ring.Nodes, n)
 	}
+
+	return ring
 }
 
 func main() {
+	var replicas int
+	var hashType string
 	var bindAddress string
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -82,15 +91,24 @@ func main() {
 		"IP:PORT to listen for HTTP requests.")
 	flag.StringVar(&bindAddress, "b", "0.0.0.0:4242",
 		"IP:PORT to listen for HTTP requests.")
-	flag.StringVar(&hashring.Name, "node", hostname,
+	flag.StringVar(&hostname, "node", hostname,
 		"This node's name in the Graphite consistent hash ring.")
-	flag.StringVar(&hashring.Name, "n", hostname,
+	flag.StringVar(&hostname, "n", hostname,
 		"This node's name in the Graphite consistent hash ring.")
 	flag.BoolVar(&sparseFiles, "sparse", false,
 		"Be aware of sparse Whisper DB files.")
-
+	flag.StringVar(&hashType, "hash", "carbon",
+		fmt.Sprintf("Consistent Hash algorithm to use: %v", SupportedHashTypes))
+	flag.IntVar(&replicas, "replicas", 1,
+		"Number of copies of each metric in the cluster.")
 	flag.Parse()
-	parseRing()
+
+	i := sort.SearchStrings(SupportedHashTypes, hashType)
+	if i == len(SupportedHashTypes) || SupportedHashTypes[i] != hashType {
+		log.Fatalf("Invalide hash type.  Supported types: %v",
+			SupportedHashTypes)
+	}
+	hashring = parseRing(hostname, hashType, replicas)
 
 	http.HandleFunc("/", http.NotFound)
 	http.HandleFunc("/metrics", listMetrics)

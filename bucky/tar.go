@@ -190,8 +190,9 @@ func TarJSONMetrics(servers []string, fd io.Reader, force bool) error {
 
 // tarCommand runs this subcommand.
 func tarCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
@@ -203,13 +204,16 @@ func tarCommand(c Command) int {
 		log.Fatal("Refusing to write tar file to terminal.")
 	}
 
-	var err error
+	if !Cluster.Healthy {
+		log.Printf("Warning: Cluster is not optimal.")
+	}
+
 	if listRegexMode && c.Flag.NArg() > 0 {
-		err = TarRegexMetrics(servers, c.Flag.Arg(0), listForce)
+		err = TarRegexMetrics(Cluster.HostPorts(), c.Flag.Arg(0), listForce)
 	} else if c.Flag.Arg(0) != "-" {
-		err = TarSliceMetrics(servers, c.Flag.Args(), listForce)
+		err = TarSliceMetrics(Cluster.HostPorts(), c.Flag.Args(), listForce)
 	} else {
-		err = TarJSONMetrics(servers, os.Stdin, listForce)
+		err = TarJSONMetrics(Cluster.HostPorts(), os.Stdin, listForce)
 	}
 
 	if err != nil {

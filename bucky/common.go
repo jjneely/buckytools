@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -49,7 +48,7 @@ func DeleteMetric(server, metric string) error {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric,
 	}
 
@@ -94,7 +93,7 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + name,
 	}
 	r, err := http.NewRequest("GET", u.String(), nil)
@@ -136,7 +135,7 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric,
 	}
 
@@ -186,13 +185,14 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 	return nil, fmt.Errorf("Unexpected error in StatRemoteMetric()")
 }
 
-// GetSingleHashRing connects to the given server and returns a slice of
-// strings containing the host's configured hashring.  An error value is
-// set if we could not retrieve the hashring information.
+// GetSingleHashRing connects to the given server and returns a JSONRingType
+// representing its hashring configuration.  An error value is
+// set if we could not retrieve the hashring information.  The server
+// string must include any port information.
 func GetSingleHashRing(server string) (*JSONRingType, error) {
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, GetBuckyPort()),
+		Host:   server,
 		Path:   "/hashring",
 	}
 	httpClient := GetHTTP()
@@ -222,28 +222,11 @@ func GetSingleHashRing(server string) (*JSONRingType, error) {
 	}
 	err = json.Unmarshal(blob, &ring)
 	if err != nil {
-		log.Printf("Abort: %s", err)
+		log.Printf("Could not unmarshal JSON from host %s: %s", server, err)
 		return nil, err
 	}
 
 	return ring, nil
-}
-
-// GetBuckyPort returns the port number as a string where the buckyd
-// daemon runs.  Useful for discovering hosts in the hash ring and
-// knowing what port to find buckyd on.  We assume that all hosts in
-// the cluster are configured consistently.
-func GetBuckyPort() string {
-	if !strings.Contains(HostPort, ":") {
-		return "4242"
-	}
-
-	_, port, err := net.SplitHostPort(HostPort)
-	if err != nil {
-		log.Fatalf("Fatal Error: Could not understand host: %s  %s", HostPort, err)
-	}
-
-	return port
 }
 
 // HostPort is a convenience variable for sub-commands.  This holds the
@@ -292,7 +275,7 @@ func SetupJSON(c Command) {
 		"Instead of text ouput JSON encoded data.")
 }
 
-// CleanMetric sanitizes the givem metric key by removing adjacent "."
+// CleanMetric sanitizes the given metric key by removing adjacent "."
 // characters and replacing any "/" characters with "."
 func CleanMetric(m string) string {
 	// Slash isn't really illegal but gets interperated as a directory

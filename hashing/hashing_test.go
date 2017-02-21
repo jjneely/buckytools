@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func makeRing() *HashRing {
-	hr := NewHashRing()
+func makeRing() *CarbonHashRing {
+	hr := NewCarbonHashRing()
 	hr.AddNode(NewNode("graphite010-g5", "a"))
 	hr.AddNode(NewNode("graphite010-g5", "b"))
 	hr.AddNode(NewNode("graphite010-g5", "c"))
@@ -86,7 +86,7 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestNewHashRing(t *testing.T) {
-	hr := NewHashRing()
+	hr := NewCarbonHashRing()
 	hr.SetReplicas(5)
 	if hr.Replicas() != 5 {
 		t.Error("HashRing replica setting error")

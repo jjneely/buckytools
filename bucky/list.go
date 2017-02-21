@@ -306,21 +306,21 @@ func ListJSONMetrics(servers []string, fd io.Reader, force bool) (map[string][]s
 
 // listCommand runs this subcommand.
 func listCommand(c Command) int {
-	servers := GetAllBuckyd()
-	if servers == nil {
+	_, err := GetClusterConfig(HostPort)
+	if err != nil {
+		log.Print(err)
 		return 1
 	}
 
 	var list map[string][]string
-	var err error
 	if c.Flag.NArg() == 0 {
-		list, err = ListAllMetrics(servers, listForce)
+		list, err = ListAllMetrics(Cluster.HostPorts(), listForce)
 	} else if listRegexMode && c.Flag.NArg() > 0 {
-		list, err = ListRegexMetrics(servers, c.Flag.Arg(0), listForce)
+		list, err = ListRegexMetrics(Cluster.HostPorts(), c.Flag.Arg(0), listForce)
 	} else if c.Flag.Arg(0) != "-" {
-		list, err = ListSliceMetrics(servers, c.Flag.Args(), listForce)
+		list, err = ListSliceMetrics(Cluster.HostPorts(), c.Flag.Args(), listForce)
 	} else {
-		list, err = ListJSONMetrics(servers, os.Stdin, listForce)
+		list, err = ListJSONMetrics(Cluster.HostPorts(), os.Stdin, listForce)
 	}
 
 	results := make([]string, 0)
