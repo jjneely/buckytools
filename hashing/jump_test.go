@@ -1,8 +1,27 @@
 package hashing
 
 import (
+	"sort"
+	"strings"
 	"testing"
 )
+
+type nodesSlice [][]string
+
+var jumpHashTestNodesWithInstanceName = nodesSlice{
+	{"graphite010-g5", "5"},
+	{"graphite011-g5", "1"},
+	{"graphite012-g5", "4"},
+	{"graphite013-g5", "3"},
+	{"graphite-data019-g5" ,"2"},
+	{"graphite-data020-g5", "6"},
+	{"graphite-data021-g5", "0"},
+}
+
+//makes nodesSlice sortable
+func (c nodesSlice) Len() int      { return len(c) }
+func (c nodesSlice) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c nodesSlice) Less(i, j int) bool { return strings.Compare(c[i][1], c[j][1]) == -1 }
 
 var jumpHashTestNodes = []string{
 	"graphite010-g5",
@@ -61,6 +80,14 @@ func makeJumpTestCHR(r int) *JumpHashRing {
 	return chr
 }
 
+func makeJumpTestCHRWithInstanceName(r int) *JumpHashRing {
+	chr := NewJumpHashRing(r)
+	for _, v := range jumpHashTestNodesWithInstanceName {
+		chr.AddNode(Node{v[0], v[1]})
+	}
+	return chr
+}
+
 func TestFNV1a64(t *testing.T) {
 	data := map[string]uint64{
 		"foobar":  0x85944171f73967e8,
@@ -102,6 +129,21 @@ func TestJumpCHR(t *testing.T) {
 		if n.Server != node {
 			t.Errorf("Hash not compatible with carbon-c-relay: %s => %s  Should be %s",
 				key, n.Server, node)
+		}
+	}
+}
+
+func TestJumpCHRWithInstanceName(t *testing.T) {
+	chr := makeJumpTestCHRWithInstanceName(1)
+	t.Logf(chr.String())
+	//Order the slice of nodes by instance name
+	o_nodes := make(nodesSlice, len(jumpHashTestNodesWithInstanceName))
+	copy(o_nodes, jumpHashTestNodesWithInstanceName)
+	sort.Sort(o_nodes)
+	//Check that the nodes in the ring are correctly ordered by instance name
+	for index, n := range chr.ring {
+		if n.Server != o_nodes[index][0] {
+			t.Errorf("Wrong order in jump hash ring: expected to find: '%s', found %s", n.Server, o_nodes[index][0])
 		}
 	}
 }
