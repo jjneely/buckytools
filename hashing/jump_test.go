@@ -133,7 +133,7 @@ func TestJumpCHR(t *testing.T) {
 	}
 }
 
-func TestJumpCHRWithInstanceName(t *testing.T) {
+func TestJumpCHRInstanceOrder(t *testing.T) {
 	chr := makeJumpTestCHRWithInstanceName(1)
 	t.Logf(chr.String())
 	//Order the slice of nodes by instance name
