@@ -137,13 +137,13 @@ func TestJumpCHRInstanceOrder(t *testing.T) {
 	chr := makeJumpTestCHRWithInstanceName(1)
 	t.Logf(chr.String())
 	//Order the slice of nodes by instance name
-	o_nodes := make(nodesSlice, len(jumpHashTestNodesWithInstanceName))
-	copy(o_nodes, jumpHashTestNodesWithInstanceName)
-	sort.Sort(o_nodes)
+	oNodes := make(nodesSlice, len(jumpHashTestNodesWithInstanceName))
+	copy(oNodes, jumpHashTestNodesWithInstanceName)
+	sort.Sort(oNodes)
 	//Check that the nodes in the ring are correctly ordered by instance name
 	for index, n := range chr.ring {
-		if n.Server != o_nodes[index][0] {
-			t.Errorf("Wrong order in jump hash ring: expected to find: '%s', found %s", n.Server, o_nodes[index][0])
+		if n.Server != oNodes[index][0] {
+			t.Errorf("Wrong order in jump hash ring: expected to find: '%s', found %s", n.Server, oNodes[index][0])
 		}
 	}
 }
