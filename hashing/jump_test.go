@@ -13,14 +13,14 @@ var jumpHashTestNodesWithInstanceName = nodesSlice{
 	{"graphite011-g5", "1"},
 	{"graphite012-g5", "4"},
 	{"graphite013-g5", "3"},
-	{"graphite-data019-g5" ,"2"},
+	{"graphite-data019-g5", "2"},
 	{"graphite-data020-g5", "6"},
 	{"graphite-data021-g5", "0"},
 }
 
 //makes nodesSlice sortable
-func (c nodesSlice) Len() int      { return len(c) }
-func (c nodesSlice) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c nodesSlice) Len() int           { return len(c) }
+func (c nodesSlice) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c nodesSlice) Less(i, j int) bool { return strings.Compare(c[i][1], c[j][1]) == -1 }
 
 var jumpHashTestNodes = []string{
@@ -144,6 +144,16 @@ func TestJumpCHRInstanceOrder(t *testing.T) {
 	for index, n := range chr.ring {
 		if n.Server != oNodes[index][0] {
 			t.Errorf("Wrong order in jump hash ring: expected to find: '%s', found %s", n.Server, oNodes[index][0])
+		}
+	}
+}
+
+func TestJumpCHRNoInstanceOrder(t *testing.T) {
+	chr := makeJumpTestCHR(1)
+
+	for i, n := range chr.ring {
+		if n.Server != jumpHashTestNodes[i] {
+			t.Errorf("Wrong order in jump hash ring with no instances: expected %s and found %s", jumpHashTestNodes[i], n.Server)
 		}
 	}
 }
