@@ -93,7 +93,7 @@ func (chr *JumpHashRing) AddNode(node Node) {
 		chr.ring = append(chr.ring, node)
 	} else {
 		i := 0
-		for i = 0; i < chr.Len() && node.Instance <= chr.ring[i].Instance; i++ {
+		for i = 0; i < chr.Len() && node.Instance >= chr.ring[i].Instance; i++ {
 		}
 		chr.ring = append(chr.ring, node)  // Make room
 		copy(chr.ring[i+1:], chr.ring[i:]) // Shuffle array
