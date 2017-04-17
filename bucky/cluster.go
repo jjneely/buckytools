@@ -55,7 +55,7 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 		return nil, err
 	}
 
-	server, port, err := net.SplitHostPort(HostPort)
+	_, port, err := net.SplitHostPort(hostport)
 	if err != nil {
 		log.Printf("Abort: Invalid host:port representation: %s", hostport)
 		return nil, err
@@ -86,14 +86,14 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 
 	members := make([]*JSONRingType, 0)
 	for _, srv := range Cluster.Servers {
-		if srv == server {
+		if srv == master.Name {
 			// Don't query the initial daemon again
 			continue
 		}
 		host := fmt.Sprintf("%s:%s", srv, Cluster.Port)
 		member, err := GetSingleHashRing(host)
 		if err != nil {
-			log.Printf("Cluster unhealthy: %s: %s", server, err)
+			log.Printf("Cluster unhealthy: %s: %s", host, err)
 		}
 		members = append(members, member)
 	}
@@ -104,9 +104,12 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 
 // isHealthy will return true if the cluster ring data represents
 // a healthy cluster.  The master is the initial buckyd daemon we
-// built the list from.
+// built the list from.  The ring is a slice of ring objects from each
+// server in the cluster except the initial buckyd daemon.
 func isHealthy(master *JSONRingType, ring []*JSONRingType) bool {
 	// XXX: Take replicas into account
+	// The initial buckyd daemon isn't in the ring, so we need to add 1
+	// to the length.
 	if len(master.Nodes) != len(ring)+1 {
 		return false
 	}
