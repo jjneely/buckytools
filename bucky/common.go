@@ -93,8 +93,12 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + name,
+	}
+	if strings.Index(server, ':') != -1 {
+		u.Host = fmt.Sprintf("%s:%s", server, Cluster.Port)
+	} else {
+		u.Host = server
 	}
 	r, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
