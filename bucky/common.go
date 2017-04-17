@@ -95,7 +95,7 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		Scheme: "http",
 		Path:   "/metrics/" + name,
 	}
-	if strings.Index(server, ':') != -1 {
+	if strings.IndexRune(server, ':') != -1 {
 		u.Host = fmt.Sprintf("%s:%s", server, Cluster.Port)
 	} else {
 		u.Host = server
