@@ -95,7 +95,6 @@ func getMetricCache(u url.URL, body *string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	host := strings.Split(u.Host, ":")[0]
 	metrics := make([]string, 0)
 	blob, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -108,8 +107,8 @@ func getMetricCache(u url.URL, body *string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	log.Printf("%s returned %d metrics", host, len(metrics))
-	return map[string][]string{host: metrics}, nil
+	log.Printf("%s returned %d metrics", u.Host, len(metrics))
+	return map[string][]string{u.Host: metrics}, nil
 }
 
 // HTTPFetch attempts to build and execute an *http.Request with a Fibonacci

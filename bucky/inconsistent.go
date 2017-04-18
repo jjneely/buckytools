@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"sort"
 	"strings"
@@ -37,6 +38,7 @@ Use bucky rebalance to correct.`
 func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 	var list map[string][]string
 	var err error
+
 	list, err = ListAllMetrics(hostports, listForce)
 	if err != nil {
 		log.Printf("Error retrieving metric lists: %s", err)
@@ -47,13 +49,18 @@ func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 	log.Printf("Hashing...")
 	t := time.Now().Unix()
 	for server, metrics := range list {
+		host, _, err := net.SplitHostPort(server)
+		if err != nil {
+			log.Printf("Malformed hostname: %s", server)
+			return nil, err
+		}
 		for _, m := range metrics {
 			if strings.HasPrefix(m, "carbon.agents.") {
 				// These metrics are inserted into the stream after hashing
 				// is done.  They will never be consistent and shouldn't be.
 				continue
 			}
-			if Cluster.Hash.GetNode(m).Server != server {
+			if Cluster.Hash.GetNode(m).Server != host {
 				results[server] = append(results[server], m)
 			}
 		}

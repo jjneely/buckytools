@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -95,11 +96,15 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		Scheme: "http",
 		Path:   "/metrics/" + name,
 	}
-	if strings.IndexRune(server, ':') != -1 {
-		u.Host = fmt.Sprintf("%s:%s", server, Cluster.Port)
-	} else {
-		u.Host = server
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		log.Printf("Malformed hostname: %s", server)
+		return nil, err
 	}
+	if port == "" {
+		port = Cluster.Port
+	}
+	u.Host = net.JoinHostPort(host, port)
 	r, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
