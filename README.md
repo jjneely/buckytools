@@ -150,6 +150,26 @@ Discover the exact storage used by a set of metrics:
     export BUCKYHOST=-h graphite010-g5:4242
     bucky du -r '^1min\.ipvs\.'
 
+Notes
+=====
+
+Deleting Metrics
+----------------
+
+The daemon makes no effort to remove possibly empty directories when deleting
+a metric.  This can potentially cause race conditions with carbon-cache.py
+creating a new metric in a would be deleted directory.  Once carbon-cache.py
+closes the file handle to a file in a deleted directory that file will also
+be deleted.  The delete action must not cause harm to other metrics.
+
+To prune old or empty directories from your Graphite whisper store use a
+cron job similar to this:
+
+    /usr/bin/find ${prefix}/storage/whisper -type d -empty -mtime +1 -delete
+
+This checks that the directory has not been modified in more than 1 day
+which, in most cases, avoids race conditions.
+
 To Do / Bugs
 ============
 
