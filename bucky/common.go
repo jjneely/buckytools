@@ -49,9 +49,17 @@ func DeleteMetric(server, metric string) error {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric,
 	}
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		log.Printf("Malformed hostname: %s", server)
+		return err
+	}
+	if port == "" {
+		port = Cluster.Port
+	}
+	u.Host = net.JoinHostPort(host, port)
 
 	r, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
@@ -144,10 +152,17 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
 		Path:   "/metrics/" + metric,
 	}
-
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		log.Printf("Malformed hostname: %s", server)
+		return nil, err
+	}
+	if port == "" {
+		port = Cluster.Port
+	}
+	u.Host = net.JoinHostPort(host, port)
 	r, err := http.NewRequest("HEAD", u.String(), nil)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
