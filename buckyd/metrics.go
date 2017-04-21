@@ -165,6 +165,16 @@ func deleteMetric(w http.ResponseWriter, path string, fatal bool) error {
 			return err
 		}
 	}
+	// removing an empty dirs left after a metric removal
+	// it will keep iterating thru a dirs till it get an error or reach the Prefix
+	// Normally the error should be "directory not empty"
+	for path = filepath.Dir(path); path != Prefix; path = filepath.Dir(path) {
+		err := os.Remove(path)
+		if err != nil {
+			break
+		}
+	}
+
 	return nil
 }
 
