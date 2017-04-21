@@ -62,6 +62,27 @@ func makeRing() *CarbonHashRing {
 	return hr
 }
 
+func TestEmptyInstance(t *testing.T) {
+	hr := NewCarbonHashRing()
+
+	for _, s := range []string{"test01", "test02"} {
+		n := NewNode(s, "")
+		hr.AddNode(n)
+	}
+
+	expected := map[string]string{
+		"statsd.disk.free1": "test02:None",
+		"statsd.disk.free2": "test02:None",
+		"statsd.disk.free3": "test01:None",
+	}
+	for k, v := range expected {
+		node := hr.GetNode(k)
+		if node.String() != v {
+			t.Errorf("Hash not compatible: %s !=> %s, rather %s", k, v, node)
+		}
+	}
+}
+
 func TestNewNode(t *testing.T) {
 	n := NewNode("graphite010-g5", "a")
 	if n.KeyValue() != "('graphite010-g5', 'a')" {
@@ -125,7 +146,7 @@ func TestGraphiteCompatible(t *testing.T) {
 	for k, v := range expected {
 		node := hr.GetNode(k)
 		if node.String() != v {
-			t.Error("Hash not compatible: %s !=> %s, rather %s", k, v, node)
+			t.Errorf("Hash not compatible: %s !=> %s, rather %s", k, v, node)
 		}
 	}
 }

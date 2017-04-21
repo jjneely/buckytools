@@ -181,7 +181,7 @@ func (t Node) KeyValue() string {
 // Node.String returns a string representation of the Node struct
 func (t Node) String() string {
 	if t.Instance == "" {
-		return fmt.Sprintf("%s", t.Server)
+		return fmt.Sprintf("%s:None", t.Server)
 	}
 	return fmt.Sprintf("%s:%s", t.Server, t.Instance)
 }
