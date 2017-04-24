@@ -1,3 +1,9 @@
+buckytools (0.2.0) unstable; urgency=medium
+
+  * Package 0.2.0 with jump support
+
+ -- Jack Neely <jjneely@42lines.net>  Mon, 24 Apr 2017 15:04:48 -0400
+
 buckytools (0.1.9) unstable; urgency=medium
 
   * bucky-sparsify
