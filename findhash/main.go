@@ -32,7 +32,7 @@ func getConfig(file string) []string {
 	return ret
 }
 
-func printKeyAnalysis(hr *hashing.HashRing, file string) {
+func printKeyAnalysis(hr *hashing.CarbonHashRing, file string) {
 	keys := make(map[string]int)
 	total := 0
 	data, err := ioutil.ReadFile(file)
@@ -65,7 +65,7 @@ func printKeyAnalysis(hr *hashing.HashRing, file string) {
 	fmt.Printf("Deviation: %.4f\n", math.Sqrt(variance/float64(len(keys))))
 }
 
-func printAnalysis(hr *hashing.HashRing) {
+func printAnalysis(hr *hashing.CarbonHashRing) {
 	hash := hr.BucketsPerNode()
 	keys := make([]string, 0)
 	min := 0xFFFF
@@ -94,8 +94,8 @@ func printAnalysis(hr *hashing.HashRing) {
 	fmt.Printf("Deviation: %.4f\n", math.Sqrt(v))
 }
 
-func makeRing(config []string) *hashing.HashRing {
-	hr := hashing.NewHashRing()
+func makeRing(config []string) *hashing.CarbonHashRing {
+	hr := hashing.NewCarbonHashRing()
 	for _, n := range config {
 		fields := strings.Split(n, ":")
 		if len(fields) < 2 {
