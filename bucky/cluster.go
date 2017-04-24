@@ -75,7 +75,9 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 	}
 
 	for _, v := range master.Nodes {
-		// strip instance values
+		// There are two formats for the hashring here -- INSTANCE is optional
+		// 1) SERVER:INSTANCE
+		// 2) SERVER
 		fields := strings.Split(v, ":")
 		Cluster.Servers = append(Cluster.Servers, fields[0])
 		if len(fields) < 2 {

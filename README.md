@@ -108,7 +108,14 @@ pass to the daemon as arguments the members of the consistent hash ring.
 Here `--node` is the name of this Graphite node (if different from what
 is derived from the host name).  `-b` or `--bind` is the address to bind
 to.  You can also specify `--prefix`` where your Whisper data store is
-and `--tmpdir` where the daemon can write temporary files.
+and `--tmpdir` where the daemon can write temporary files.  The following
+non-option arguments are the servers and instances that make up the hashring.
+Order is important.  The hashring members can be specified in the following
+formats:
+
+* `SERVER`
+* `SERVER:INSTANCE`
+* `SERVER:PORT:INSTANCE`
 
 This exposes a REST API that is documented in REST_API_NOTES.md.
 

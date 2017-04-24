@@ -30,8 +30,8 @@ func usage() {
 		"\tstore.  The non-optional arguments are the members of your\n",
 		"\tconsistent hashring as found in your carbon-relay configuration\n.",
 		"\tAll of the daemons in your cluster need to be able to build\n",
-		"\tthe same hashring.  Specifying the port number between the\n",
-		"\tserver and instance is optional.\n\n",
+		"\tthe same hashring.  You may specify nodes in the following\n",
+		"\tformats: SERVER, SERVER:INSTANCE, SERVER:PORT:INSTANCE.\n",
 	}
 
 	fmt.Printf(strings.Join(t, ""), os.Args[0], Version)
