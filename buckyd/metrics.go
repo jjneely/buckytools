@@ -300,6 +300,7 @@ func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
 		}
+		w.Header().Set("content-encoding", "snappy")
 		content = bytes.NewReader(blob.Bytes())
 	} else {
 		content = fd

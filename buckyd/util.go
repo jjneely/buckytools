@@ -66,6 +66,7 @@ func copySparse(dst *os.File, src io.Reader) (written int64, err error) {
 // error is success for us and we return a nil error.
 func copySnappy(src io.Reader) (dst *bytes.Buffer, err error) {
 	buf := make([]byte, 4*1024) // work in 4k chunks
+	dst = new(bytes.Buffer)
 	writer := snappy.NewBufferedWriter(dst)
 	for {
 		nr, er := src.Read(buf)
