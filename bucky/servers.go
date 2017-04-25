@@ -16,6 +16,7 @@ than the other members.  Using -s for a single host check tests if the given hos
 is alive.`
 
 	c := NewCommand(serversCommand, "servers", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 }

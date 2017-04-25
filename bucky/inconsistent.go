@@ -27,6 +27,7 @@ is the server the metric is presently found on.
 Use bucky rebalance to correct.`
 
 	c := NewCommand(inconsistentCommand, "inconsistent", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 	SetupJSON(c)

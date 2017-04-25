@@ -12,7 +12,20 @@ import (
 	"strings"
 )
 
+import "github.com/golang/snappy"
+
 import . "github.com/jjneely/buckytools"
+
+// HostPort is a convenience variable for sub-commands.  This holds the
+// HOST:PORT to connect to if SetupHostname() is called in init()
+var HostPort string
+
+// NoEncoding is a flag to disable compression of transferred Whisper
+// files.  Or other possible encodings of transferred files.
+var NoEncoding bool
+
+// Verbose is a flag to indicate verbose logging
+var Verbose bool
 
 // httpClient is a cached http.Client. Use GetHTTP() to setup and return.
 var httpClient *http.Client
@@ -118,6 +131,9 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		log.Printf("Error building request: %s", err)
 		return nil, err
 	}
+	if !NoEncoding {
+		r.Header.Set("accept-encoding", "snappy")
+	}
 
 	resp, err := httpClient.Do(r)
 	if err != nil {
@@ -139,10 +155,22 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		return nil, err
 	}
 
-	data.Data, err = ioutil.ReadAll(resp.Body)
+	encoding := resp.Header.Get("Content-Encoding")
+	switch encoding {
+	case "snappy":
+		snp := snappy.NewReader(resp.Body)
+		data.Data, err = ioutil.ReadAll(snp)
+	default:
+		data.Data, err = ioutil.ReadAll(resp.Body)
+	}
 	if err != nil {
 		log.Printf("Error reading response body: %s", err)
 		return nil, err
+	}
+	if int64(len(data.Data)) != data.Size {
+		log.Printf("Encoding error: Unencoded data size does not match original %d != %d",
+			len(data.Data), data.Size)
+		return nil, fmt.Errorf("Encoding error")
 	}
 
 	return data, nil
@@ -253,9 +281,15 @@ func GetSingleHashRing(server string) (*JSONRingType, error) {
 	return ring, nil
 }
 
-// HostPort is a convenience variable for sub-commands.  This holds the
-// HOST:PORT to connect to if SetupHostname() is called in init()
-var HostPort string
+// SetupCommon sets up common flags for all modules
+func SetupCommon(c Command) {
+	c.Flag.BoolVar(&Verbose, "v", false,
+		"Verbose log output.")
+	c.Flag.BoolVar(&Verbose, "verbose", false,
+		"Verbose log output.")
+	c.Flag.BoolVar(&NoEncoding, "no-encoding", false,
+		"Disable Content-Encoding methods for HTTP API calls.")
+}
 
 // SetupHostname sets up a generic find the host to connect to flag
 func SetupHostname(c Command) {

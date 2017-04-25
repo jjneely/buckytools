@@ -74,7 +74,7 @@ func NewCommand(run func(c Command) int, name, usage, short, long string) Comman
 func usage() {
 	t := []string{
 		"%s <sub-command> [options]\n",
-		"Copyright 2015 42 Lines, Inc\n",
+		"Copyright 2015 - 2017 42 Lines, Inc\n",
 		"Original Author: Jack Neely <jjneely@42lines.net>\n",
 		"Version: %s\n\n",
 		"\tBucky is a CLI designed to work with large consistent hashing\n",

@@ -42,6 +42,7 @@ Set -w to change the number of worker threads used to upload the Whisper
 DBs to the remote servers.`
 
 	c := NewCommand(restoreCommand, "restore", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 

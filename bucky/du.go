@@ -29,6 +29,7 @@ Use -s to only find metrics found on the server specified by -h or the
 BUCKYSERVER environment variable.`
 
 	c := NewCommand(duCommand, "du", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 	SetupJSON(c)

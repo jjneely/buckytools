@@ -48,6 +48,7 @@ The tar archive is written to STDOUT and will not be written to a
 terminal.`
 
 	c := NewCommand(tarCommand, "tar", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 	SetupJSON(c)
@@ -74,7 +75,7 @@ func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {
 
 		err := tw.WriteHeader(th)
 		if err != nil {
-			log.Fatal("Error writing tar: %s", err)
+			log.Fatalf("Error writing tar: %s", err)
 		}
 		_, err = tw.Write(work.Data)
 	}

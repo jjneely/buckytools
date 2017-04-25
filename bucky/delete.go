@@ -34,6 +34,7 @@ Use -s to only delete metrics found on the server specified by -h or the
 BUCKYSERVER environment variable.`
 
 	c := NewCommand(deleteCommand, "delete", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 	SetupJSON(c)

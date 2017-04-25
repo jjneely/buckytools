@@ -26,6 +26,7 @@ environment variable.  Without -s, we verify the health of the cluster before
 calculating metric locations.`
 
 	c := NewCommand(locateCommand, "locate", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 	SetupJSON(c)

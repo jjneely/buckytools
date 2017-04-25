@@ -65,6 +65,7 @@ actual location of the metric and not the location computed by the
 consistent hash ring.  Combined with -j the JSON output will be a hash.`
 
 	c := NewCommand(listCommand, "list", usage, short, long)
+	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 	SetupJSON(c)
