@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -265,6 +266,7 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 // not in the middle of an update by carbon-cache.  The parameter metric is
 // the dotted notation of the metric name.
 func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
+	var content io.ReadSeeker
 	modTime, err := statMetric(w, metric, path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -286,5 +288,16 @@ func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
 		return
 	}
 
-	http.ServeContent(w, r, path, modTime, fd)
+	if r.Header.Get("accept-encoding") == "snappy" {
+		blob, err := copySnappy(fd)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		content = bytes.NewReader(blob.Bytes())
+	} else {
+		content = fd
+	}
+
+	http.ServeContent(w, r, path, modTime, content)
 }

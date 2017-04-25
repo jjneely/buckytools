@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+import "github.com/golang/snappy"
+
 // copySparse copies a file like interface src to the file dst.  Any 4KiB
 // chunk of null bytes in the src will become a sparse hole in the dst file.
 // Therefore, this converts files to sparse files on disk.
@@ -56,6 +58,34 @@ func copySparse(dst *os.File, src io.Reader) (written int64, err error) {
 		}
 	}
 	return written, err
+}
+
+// copySnappy takes an io.Reader interface and returns a bytes.Buffer
+// containing the data read from the Reader compressed via the Goolge
+// Snappy algorithm.  Errors reading, if any, are returned.  An io.EOF
+// error is success for us and we return a nil error.
+func copySnappy(src io.Reader) (dst *bytes.Buffer, err error) {
+	buf := make([]byte, 4*1024) // work in 4k chunks
+	writer := snappy.NewBufferedWriter(dst)
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			_, ew := writer.Write(buf[0:nr])
+			if ew != nil {
+				err = ew
+				break
+			}
+		}
+		if er == io.EOF {
+			break
+		}
+		if er != nil {
+			err = er
+			break
+		}
+	}
+	writer.Close()
+	return dst, err
 }
 
 // logRequest logs an incoming HTTP request.
