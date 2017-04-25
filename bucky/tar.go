@@ -73,11 +73,19 @@ func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {
 		th.Mode = work.Mode
 		th.ModTime = time.Unix(work.ModTime, 0)
 
-		err := tw.WriteHeader(th)
+		data, err := MetricDecode(work)
+		if err != nil {
+			log.Printf("Skipping %s due to error: %s", work.Name, err)
+			continue
+		}
+		err = tw.WriteHeader(th)
 		if err != nil {
 			log.Fatalf("Error writing tar: %s", err)
 		}
-		_, err = tw.Write(work.Data)
+		_, err = tw.Write(data)
+		if err != nil {
+			log.Fatalf("Error writing data to tar file: %s", err)
+		}
 	}
 
 	err := tw.Close()

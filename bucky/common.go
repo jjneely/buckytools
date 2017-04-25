@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,14 +31,22 @@ var Verbose bool
 // httpClient is a cached http.Client. Use GetHTTP() to setup and return.
 var httpClient *http.Client
 
+// Supported Encodings
+const (
+	EncIdentity = iota
+	EncSnappy
+	EncMax
+)
+
 // MetricData represents an individual metric and its raw data.
 // XXX: Unify this with MetricStatType?
 type MetricData struct {
-	Name    string
-	Size    int64
-	Mode    int64
-	ModTime int64
-	Data    []byte
+	Name     string
+	Size     int64
+	Mode     int64
+	ModTime  int64
+	Encoding int
+	Data     []byte `json:"-"`
 }
 
 // GetHTTP returns a *http.Client that can be used to interact with remote
@@ -53,6 +62,56 @@ func GetHTTP() *http.Client {
 	//httpClient.Timeout = 30 * time.Second
 
 	return httpClient
+}
+
+// MetricDecode accepts a MetricData struct and returns a slice of bytes
+// that is the data from the MetricData struct decoded.
+func MetricDecode(metric *MetricData) ([]byte, error) {
+	var data []byte
+	var err error
+
+	switch metric.Encoding {
+	case EncIdentity:
+		return metric.Data, nil
+	case EncSnappy:
+		snp := snappy.NewReader(bytes.NewBuffer(metric.Data))
+		data, err = ioutil.ReadAll(snp)
+	}
+	if int64(len(data)) != metric.Size {
+		log.Printf("Encoding error: Unencoded data size does not match original %d != %d",
+			len(data), metric.Size)
+		return data, fmt.Errorf("Encoding error")
+	}
+
+	return data, err
+}
+
+// MetricEncode takes a completed MetricData struct and upgrades the
+// encoding provided the initial encoding is the identity encoding.
+// Basically, this compresses the data.
+func MetricEncode(metric *MetricData, encoding int) error {
+	if metric.Encoding != 0 {
+		return fmt.Errorf("Metric already encoded to encoding type %d",
+			metric.Encoding)
+	}
+	if encoding == 0 {
+		// Success!
+		return nil
+	}
+	if encoding >= EncMax || encoding < 0 {
+		return fmt.Errorf("Invalid encoding type %d", encoding)
+	}
+
+	buf := new(bytes.Buffer)
+	writer := snappy.NewBufferedWriter(buf)
+	_, ew := writer.Write(metric.Data)
+	if ew != nil {
+		return ew
+	}
+	writer.Close()
+	metric.Data = buf.Bytes()
+
+	return nil
 }
 
 // DeleteMetric sends a DELETE request for the given metric to the given
@@ -155,22 +214,17 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		return nil, err
 	}
 
+	data.Data, err = ioutil.ReadAll(resp.Body)
 	encoding := resp.Header.Get("Content-Encoding")
 	switch encoding {
 	case "snappy":
-		snp := snappy.NewReader(resp.Body)
-		data.Data, err = ioutil.ReadAll(snp)
+		data.Encoding = EncSnappy
 	default:
-		data.Data, err = ioutil.ReadAll(resp.Body)
+		data.Encoding = EncIdentity
 	}
 	if err != nil {
 		log.Printf("Error reading response body: %s", err)
 		return nil, err
-	}
-	if int64(len(data.Data)) != data.Size {
-		log.Printf("Encoding error: Unencoded data size does not match original %d != %d",
-			len(data.Data), data.Size)
-		return nil, fmt.Errorf("Encoding error")
 	}
 
 	return data, nil
@@ -235,6 +289,59 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 
 	// shouldn't get here
 	return nil, fmt.Errorf("Unexpected error in StatRemoteMetric()")
+}
+
+// PostMetric sends a POST request with new metric data to the given server.
+// A post request does a backfill if this metric is already present on disk.
+func PostMetric(server string, metric *MetricData) error {
+	httpClient := GetHTTP()
+	u := &url.URL{
+		Scheme: "http",
+		Path:   "/metrics/" + metric.Name,
+	}
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		log.Printf("Malformed hostname: %s", server)
+		return nil
+	}
+	if port == "" {
+		port = Cluster.Port
+	}
+	u.Host = net.JoinHostPort(host, port)
+
+	buf := bytes.NewBuffer(metric.Data)
+	r, err := http.NewRequest("POST", u.String(), buf)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return err
+	}
+	statInfo, err := json.Marshal(metric)
+	if err != nil {
+		return err
+	}
+	r.Header.Set("X-Metric-Stat", string(statInfo))
+	r.Header.Set("Content-Type", "application/octet-stream")
+	switch metric.Encoding {
+	case EncSnappy:
+		r.Header.Set("Content-Encoding", "snappy")
+	}
+
+	// This doesn't return until the backfill operation completes
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error communicating with server: %s", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		msg := fmt.Sprintf("Error reported by server: %s for metric %s",
+			resp.Status, metric.Name)
+		log.Printf("%s", msg)
+		return fmt.Errorf("%s", msg)
+	}
+
+	return nil
 }
 
 // GetSingleHashRing connects to the given server and returns a JSONRingType

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -52,42 +50,6 @@ DBs to the remote servers.`
 		"Downloader threads.")
 	c.Flag.StringVar(&tarPrefix, "p", "",
 		"Prefix all metrics in the tar file with this path.")
-}
-
-// PostMetric sends a POST request with new metric data to the given server.
-// A post request does a backfill if this metric is already present on disk.
-func PostMetric(server string, metric *MetricData) error {
-	httpClient := GetHTTP()
-	u := &url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%s", server, Cluster.Port),
-		Path:   "/metrics/" + metric.Name,
-	}
-
-	buf := bytes.NewBuffer(metric.Data)
-	r, err := http.NewRequest("POST", u.String(), buf)
-	if err != nil {
-		log.Printf("Error building request: %s", err)
-		return err
-	}
-	r.Header.Set("Content-Type", "application/octet-stream")
-
-	// This doesn't return until the backfill operation completes
-	resp, err := httpClient.Do(r)
-	if err != nil {
-		log.Printf("Error communicating with server: %s", err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		msg := fmt.Sprintf("Error reported by server: %s for metric %s",
-			resp.Status, metric.Name)
-		log.Printf("%s", msg)
-		return fmt.Errorf("%s", msg)
-	}
-
-	return nil
 }
 
 func restoreTarWorker(workIn chan *MetricData, servers []string, wg *sync.WaitGroup) {

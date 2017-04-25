@@ -56,9 +56,6 @@ DBs to the remote servers.`
 		"Force the remote daemons to rebuild their cache.")
 }
 
-// func PostMetric(server string, metric *MetricData) error
-// func GetMetricData(server, name string) (*MetricData, error)
-
 func backfillWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
 	for work := range workIn {
 		log.Printf("Backfilling [%s] %s => [%s] %s",
