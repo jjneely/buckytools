@@ -294,6 +294,12 @@ func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if blob.Len() == 0 {
+			msg := "Compressed length is 0, no data to transfer"
+			log.Printf("Error: %s", msg)
+			http.Error(w, msg, http.StatusInternalServerError)
+			return
+		}
 		content = bytes.NewReader(blob.Bytes())
 	} else {
 		content = fd
