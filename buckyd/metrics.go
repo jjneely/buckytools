@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+import "github.com/golang/snappy"
+
 import . "github.com/jjneely/buckytools"
 import . "github.com/jjneely/buckytools/metrics"
 import "github.com/jjneely/buckytools/fill"
@@ -112,7 +114,7 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 		deleteMetric(w, path, true)
 	case "PUT":
 		// Replace metric data on disk
-		// XXX: Metric will still be deleted if an error in heal occurrs
+		// XXX: Metric will still be deleted if an error in heal occurs
 		err := deleteMetric(w, path, false)
 		if err == nil {
 			healMetric(w, r, path)
@@ -174,6 +176,7 @@ func deleteMetric(w http.ResponseWriter, path string, fatal bool) error {
 // doesn't exist it will be created as an identical copy of the DB found
 // in the request.
 func healMetric(w http.ResponseWriter, r *http.Request, path string) {
+	var data io.Reader
 	// Does this request look sane?
 	if r.Header.Get("Content-Type") != "application/octet-stream" {
 		http.Error(w, "Content-Type must be application/octet-stream.",
@@ -181,10 +184,16 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		log.Printf("Got send a content-type of %s, abort!", r.Header.Get("Content-Type"))
 		return
 	}
+	if r.Header.Get("content-encoding") == "snappy" {
+		data = snappy.NewReader(r.Body)
+	} else {
+		data = r.Body
+	}
 	i, err := strconv.Atoi(r.Header.Get("Content-Length"))
 	if err != nil || i <= 28 {
 		// Whisper file headers are 28 bytes and we need data too.
 		// Something is wrong here
+		// XXX: What about compression encodings?
 		log.Printf("Whisper data in request too small: %d bytes", i)
 		http.Error(w, "Whisper data in request too small.", http.StatusBadRequest)
 	}
@@ -214,7 +223,7 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		_, err = io.Copy(fd, r.Body)
+		_, err = io.Copy(fd, data)
 		if err != nil {
 			log.Printf("Error writing to temp file: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -249,9 +258,9 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		}
 
 		if sparseFiles {
-			_, err = copySparse(dst, r.Body)
+			_, err = copySparse(dst, data)
 		} else {
-			_, err = io.Copy(dst, r.Body)
+			_, err = io.Copy(dst, data)
 		}
 		if err != nil {
 			log.Printf("Error copying request body to %s: %s", path, err)

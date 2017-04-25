@@ -59,6 +59,11 @@ func restoreTarWorker(workIn chan *MetricData, servers []string, wg *sync.WaitGr
 			log.Printf("In single mode, skipping metric %s for server %s", work.Name, server)
 			continue
 		}
+		if err := MetricEncode(work, EncSnappy); err != nil {
+			log.Printf("Skipping %s due to encoding error: %s", work.Name, err)
+			workerErrors = true
+			continue
+		}
 		log.Printf("Uploading %s => %s", work.Name, server)
 		err := PostMetric(server, work)
 		if err != nil {
