@@ -16,6 +16,7 @@ import (
 import "github.com/golang/snappy"
 
 import . "github.com/jjneely/buckytools"
+import . "github.com/jjneely/buckytools/metrics"
 
 // HostPort is a convenience variable for sub-commands.  This holds the
 // HOST:PORT to connect to if SetupHostname() is called in init()
@@ -30,24 +31,6 @@ var Verbose bool
 
 // httpClient is a cached http.Client. Use GetHTTP() to setup and return.
 var httpClient *http.Client
-
-// Supported Encodings
-const (
-	EncIdentity = iota
-	EncSnappy
-	EncMax
-)
-
-// MetricData represents an individual metric and its raw data.
-// XXX: Unify this with MetricStatType?
-type MetricData struct {
-	Name     string
-	Size     int64
-	Mode     int64
-	ModTime  int64
-	Encoding int
-	Data     []byte `json:"-"`
-}
 
 // GetHTTP returns a *http.Client that can be used to interact with remote
 // buckyd daemons.
@@ -114,24 +97,37 @@ func MetricEncode(metric *MetricData, encoding int) error {
 	return nil
 }
 
+// SanitizeHostPort parses and sanitizes the host:port string.  If no port
+// is present the Cluster.Port configuration value will be used as the port.
+// The returned hostport string will have a host and port.
+func SanitizeHostPort(hostport string) (string, error) {
+	host, port, err := net.SplitHostPort(hostport)
+	// Can't just compare the err.String() as it has the hostname in it too
+	if ae, ok := err.(*net.AddrError); ok && ae.Err == "missing port in address" {
+		port = Cluster.Port
+		host = hostport
+	} else if err != nil {
+		return "", err
+	}
+
+	return net.JoinHostPort(host, port), nil
+}
+
 // DeleteMetric sends a DELETE request for the given metric to the given
 // server.  The port is assumed the same for all Bucky daemons in the
 // hash ring.
 func DeleteMetric(server, metric string) error {
+	var err error
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
 		Path:   "/metrics/" + metric,
 	}
-	host, port, err := net.SplitHostPort(server)
+	u.Host, err = SanitizeHostPort(server)
 	if err != nil {
-		log.Printf("Malformed hostname: %s", server)
+		log.Printf("Malformed hostname: %s", err)
 		return err
 	}
-	if port == "" {
-		port = Cluster.Port
-	}
-	u.Host = net.JoinHostPort(host, port)
 
 	r, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
@@ -171,20 +167,17 @@ func DeleteMetric(server, metric string) error {
 // name that lives on the given server.  The port buckyd runs on is
 // assumed to be the same as other servers in the hash ring.
 func GetMetricData(server, name string) (*MetricData, error) {
+	var err error
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
 		Path:   "/metrics/" + name,
 	}
-	host, port, err := net.SplitHostPort(server)
+	u.Host, err = SanitizeHostPort(server)
 	if err != nil {
-		log.Printf("Malformed hostname: %s", server)
+		log.Printf("Malformed hostname: %s", err)
 		return nil, err
 	}
-	if port == "" {
-		port = Cluster.Port
-	}
-	u.Host = net.JoinHostPort(host, port)
 	r, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
@@ -230,21 +223,18 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	return data, nil
 }
 
-func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
+func StatRemoteMetric(server, metric string) (*MetricData, error) {
+	var err error
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
 		Path:   "/metrics/" + metric,
 	}
-	host, port, err := net.SplitHostPort(server)
+	u.Host, err = SanitizeHostPort(server)
 	if err != nil {
-		log.Printf("Malformed hostname: %s", server)
+		log.Printf("Malformed hostname: %s", err)
 		return nil, err
 	}
-	if port == "" {
-		port = Cluster.Port
-	}
-	u.Host = net.JoinHostPort(host, port)
 	r, err := http.NewRequest("HEAD", u.String(), nil)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
@@ -265,7 +255,7 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 			log.Printf("No stat data returned for: %s", metric)
 			return nil, fmt.Errorf("No stat data returned for: %s", metric)
 		}
-		stat := new(MetricStatType)
+		stat := new(MetricData)
 		err := json.Unmarshal([]byte(data), &stat)
 		if err != nil {
 			log.Printf("Error: Could not parse X-Metric-Stat header for %s", metric)
@@ -294,20 +284,17 @@ func StatRemoteMetric(server, metric string) (*MetricStatType, error) {
 // PostMetric sends a POST request with new metric data to the given server.
 // A post request does a backfill if this metric is already present on disk.
 func PostMetric(server string, metric *MetricData) error {
+	var err error
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme: "http",
 		Path:   "/metrics/" + metric.Name,
 	}
-	host, port, err := net.SplitHostPort(server)
+	u.Host, err = SanitizeHostPort(server)
 	if err != nil {
-		log.Printf("Malformed hostname: %s", server)
+		log.Printf("Malformed hostname: %s", err)
 		return nil
 	}
-	if port == "" {
-		port = Cluster.Port
-	}
-	u.Host = net.JoinHostPort(host, port)
 
 	buf := bytes.NewBuffer(metric.Data)
 	r, err := http.NewRequest("POST", u.String(), buf)

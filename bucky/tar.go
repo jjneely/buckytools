@@ -63,7 +63,7 @@ terminal.`
 		"Downloader threads.")
 }
 
-func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {
+func writeTar(workOut chan *metrics.MetricData, wg *sync.WaitGroup) {
 	tw := tar.NewWriter(os.Stdout)
 	for work := range workOut {
 		log.Printf("Writing %s...", work.Name)
@@ -96,7 +96,7 @@ func writeTar(workOut chan *MetricData, wg *sync.WaitGroup) {
 	wg.Done()
 }
 
-func getMetricWorker(workIn chan *MetricWork, workOut chan *MetricData, wg *sync.WaitGroup) {
+func getMetricWorker(workIn chan *MetricWork, workOut chan *metrics.MetricData, wg *sync.WaitGroup) {
 	for w := range workIn {
 		metric, err := GetMetricData(w.Server, w.Name)
 		if err == nil {
@@ -113,7 +113,7 @@ func multiplexTar(metricMap map[string][]string) error {
 	wgTar := new(sync.WaitGroup)
 	wgWork := new(sync.WaitGroup)
 	workIn := make(chan *MetricWork, 25)
-	workOut := make(chan *MetricData, 25)
+	workOut := make(chan *metrics.MetricData, 25)
 
 	// Sort our work queue for sanity and balancing across the cluster
 	servers := make(map[string]string)

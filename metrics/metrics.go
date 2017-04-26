@@ -12,6 +12,23 @@ import (
 	"time"
 )
 
+// Supported Encodings
+const (
+	EncIdentity = iota
+	EncSnappy
+	EncMax
+)
+
+// MetricData represents an individual metric and its raw data.
+type MetricData struct {
+	Name     string
+	Size     int64
+	Mode     int64
+	ModTime  int64
+	Encoding int
+	Data     []byte `json:"-"` // We never JSON encode metric data
+}
+
 type MetricsCacheType struct {
 	metrics   []string
 	timestamp int64

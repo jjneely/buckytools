@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-import . "github.com/jjneely/buckytools"
+import . "github.com/jjneely/buckytools/metrics"
 
 func init() {
 	usage := "[options] <metric expression>"
@@ -42,7 +42,7 @@ BUCKYSERVER environment variable.`
 		"Worker threads.")
 }
 
-func statWorker(workIn chan *DeleteWork, workOut chan *MetricStatType, wg *sync.WaitGroup) {
+func statWorker(workIn chan *DeleteWork, workOut chan *MetricData, wg *sync.WaitGroup) {
 	for work := range workIn {
 		stat, err := StatRemoteMetric(work.server, work.name)
 		if err != nil {
@@ -54,7 +54,7 @@ func statWorker(workIn chan *DeleteWork, workOut chan *MetricStatType, wg *sync.
 	wg.Done()
 }
 
-func statResults(workOut chan *MetricStatType, wg *sync.WaitGroup) {
+func statResults(workOut chan *MetricData, wg *sync.WaitGroup) {
 	for stat := range workOut {
 		t := time.Unix(stat.ModTime, 0).UTC().Format(time.RFC3339)
 		fmt.Printf("%.2fKiB\t%s\t%s\n", float64(stat.Size)/1024.0, t, stat.Name)
@@ -66,7 +66,7 @@ func statMetrics(metricMap map[string][]string) error {
 	wg := new(sync.WaitGroup)
 	wg2 := new(sync.WaitGroup)
 	workIn := make(chan *DeleteWork, 25)
-	workOut := make(chan *MetricStatType, 25)
+	workOut := make(chan *MetricData, 25)
 
 	wg.Add(metricWorkers)
 	for i := 0; i < metricWorkers; i++ {

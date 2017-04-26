@@ -9,14 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"syscall"
 	"time"
 )
 
 import "github.com/golang/snappy"
 
-import . "github.com/jjneely/buckytools"
 import . "github.com/jjneely/buckytools/metrics"
 import "github.com/jjneely/buckytools/fill"
 
@@ -97,12 +95,17 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "HEAD":
-		_, err := statMetric(w, metric, path)
+		stat, err := statMetric(metric, path)
 		w.Header().Set("Content-Length", "0")
 		status := http.StatusOK
 		if err != nil {
 			// XXX: Type switch and better error reporting
 			status = http.StatusNotFound
+		}
+		err = setStatHeader(w, stat)
+		if err != nil {
+			log.Printf("serveMetric HEAD: %s", err)
+			status = http.StatusInternalServerError
 		}
 		w.WriteHeader(status)
 		// HEAD seems to behave a bit differently, forcing the headers
@@ -127,30 +130,35 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// statMetric stat()s the given metric file system path and add the
-// X-Metric-Stat header to the response as JSON encoded data.  It returns
-// the modTime on the file and an error code.
-func statMetric(w http.ResponseWriter, metric, path string) (time.Time, error) {
+// statMetric stat()s the given metric file system path and builds a
+// *MetricData struct representing this metric.  Data is not attached
+// and the Encoding is intentionally left as the zero value.
+func statMetric(metric, path string) (*MetricData, error) {
 	s, err := os.Stat(path)
 	if err != nil {
-		// Time is useless here -- use the zero value
-		return time.Time{}, err
+		return nil, err
 	}
 
-	stat := new(MetricStatType)
+	stat := new(MetricData)
 	stat.Name = metric
 	stat.Size = s.Size()
-	stat.Mode = uint32(s.Mode())
+	stat.Mode = int64(s.Mode())
 	stat.ModTime = s.ModTime().Unix()
 
-	// We should be able to marshal this struct without the funcs
-	blob, err := json.Marshal(stat)
+	return stat, nil
+}
+
+// setStatHeader takes a ResponseWriter and a *MetricData and adds the
+// X-Metric-Stat header to the ResponseWriter.  It should be used before
+// the body is written.
+func setStatHeader(w http.ResponseWriter, metric *MetricData) error {
+	blob, err := json.Marshal(metric)
 	if err != nil {
-		return s.ModTime(), err
+		return err
 	}
 
 	w.Header().Set("X-Metric-Stat", string(blob))
-	return s.ModTime(), nil
+	return nil
 }
 
 // deleteMetric removes a metric DB from the file system and handles
@@ -176,7 +184,9 @@ func deleteMetric(w http.ResponseWriter, path string, fatal bool) error {
 // doesn't exist it will be created as an identical copy of the DB found
 // in the request.
 func healMetric(w http.ResponseWriter, r *http.Request, path string) {
+	var err error
 	var data io.Reader
+
 	// Does this request look sane?
 	if r.Header.Get("Content-Type") != "application/octet-stream" {
 		http.Error(w, "Content-Type must be application/octet-stream.",
@@ -189,13 +199,18 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 	} else {
 		data = r.Body
 	}
-	i, err := strconv.Atoi(r.Header.Get("Content-Length"))
-	if err != nil || i <= 28 {
+	stat := new(MetricData)
+	err = json.Unmarshal([]byte(r.Header.Get("X-Metric-Stat")), &stat)
+	if err != nil {
+		log.Printf("Error decoding X-Metric-Stat header: %s", err)
+		http.Error(w, "Error decoding X-Metric-Stat header", http.StatusBadRequest)
+		return
+	}
+	if stat.Size <= 28 {
 		// Whisper file headers are 28 bytes and we need data too.
-		// Something is wrong here
-		// XXX: What about compression encodings?
-		log.Printf("Whisper data in request too small: %d bytes", i)
+		log.Printf("Whisper data in request too small: %d bytes", stat.Size)
 		http.Error(w, "Whisper data in request too small.", http.StatusBadRequest)
+		return
 	}
 
 	// Does the destination path on dist exist?
@@ -223,17 +238,21 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		_, err = io.Copy(fd, data)
-		if err != nil {
-			log.Printf("Error writing to temp file: %s", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			fd.Close()
-			os.Remove(fd.Name())
-			return
-		}
+		nr, err := io.Copy(fd, data)
 		srcName := fd.Name()
 		fd.Close()
 		defer os.Remove(srcName) // not concerned with errors here
+		if err != nil || nr != stat.Size {
+			if err != nil {
+				log.Printf("Error writing to temp file: %s", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			} else {
+				log.Printf("Decoded whisper file data does not match size %d != %d",
+					nr, stat.Size)
+				http.Error(w, "Malformed whisper data", http.StatusBadRequest)
+			}
+			return
+		}
 
 		// XXX: How can we check the tmpfile for sanity?
 		err = fill.All(srcName, path)
@@ -257,14 +276,22 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 
+		var nr int64
 		if sparseFiles {
-			_, err = copySparse(dst, data)
+			nr, err = copySparse(dst, data)
 		} else {
-			_, err = io.Copy(dst, data)
+			nr, err = io.Copy(dst, data)
 		}
-		if err != nil {
-			log.Printf("Error copying request body to %s: %s", path, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err != nil || nr != stat.Size {
+			if err != nil {
+				log.Printf("Error writing whisper data to %s: %s", path, err)
+				http.Error(w, "Error writing whisper data", http.StatusInternalServerError)
+			} else {
+				log.Printf("Decoded whisper file data does not match size %d != %d",
+					nr, stat.Size)
+				http.Error(w, "Malformed whisper data", http.StatusBadRequest)
+			}
+			defer os.Remove(dst.Name()) // not concerned with errors here
 			return
 		}
 	}
@@ -276,7 +303,7 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 // the dotted notation of the metric name.
 func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
 	var content io.ReadSeeker
-	modTime, err := statMetric(w, metric, path)
+	stat, err := statMetric(metric, path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.Error(w, "Metric not found.", http.StatusNotFound)
@@ -309,11 +336,18 @@ func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
 		}
+		stat.Encoding = EncSnappy
 		w.Header().Set("content-encoding", "snappy")
 		content = bytes.NewReader(blob.Bytes())
 	} else {
 		content = fd
 	}
 
-	http.ServeContent(w, r, path, modTime, content)
+	err = setStatHeader(w, stat)
+	if err != nil {
+		log.Printf("Error: %s", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(w, r, path, time.Unix(stat.ModTime, 0), content)
 }
