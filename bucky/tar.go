@@ -66,7 +66,9 @@ terminal.`
 func writeTar(workOut chan *metrics.MetricData, wg *sync.WaitGroup) {
 	tw := tar.NewWriter(os.Stdout)
 	for work := range workOut {
-		log.Printf("Writing %s...", work.Name)
+		if Verbose {
+			log.Printf("Writing %s...", work.Name)
+		}
 		th := new(tar.Header)
 		th.Name = metrics.MetricToRelative(work.Name)
 		th.Size = work.Size
@@ -139,6 +141,7 @@ func multiplexTar(metricMap map[string][]string) error {
 	// Feed work in
 	c := 0
 	l := len(sorted)
+	t := time.Now().Unix()
 	for _, m := range sorted {
 		work := new(MetricWork)
 		work.Name = m
@@ -146,7 +149,15 @@ func multiplexTar(metricMap map[string][]string) error {
 		workIn <- work
 		c++
 		if c%10 == 0 {
-			log.Printf("Progress %d / %d: %.2f", c, l, 100*float64(c)/float64(l))
+			now := time.Now().Unix()
+			s := now - t
+			if s == 0 {
+				s = 1
+			}
+			log.Printf("Progress %d / %d: %.2f  Metrics/second: %.2f",
+				c, l,
+				100*float64(c)/float64(l),
+				float64(c)/float64(s))
 		}
 	}
 	close(workIn)

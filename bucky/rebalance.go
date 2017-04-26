@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 )
 
 var noDelete bool
@@ -59,9 +60,11 @@ DBs to the remote servers.`
 
 func rebalanceWorker(workIn chan *MigrateWork, noDelete bool, wg *sync.WaitGroup) {
 	for work := range workIn {
-		log.Printf("Relocating [%s] %s => [%s] %s  Delete Source: %t",
-			work.oldLocation, work.oldName,
-			work.newLocation, work.newName, !noDelete)
+		if Verbose {
+			log.Printf("Relocating [%s] %s => [%s] %s  Delete Source: %t",
+				work.oldLocation, work.oldName,
+				work.newLocation, work.newName, !noDelete)
+		}
 		metric, err := GetMetricData(work.oldLocation, work.oldName)
 		if err != nil {
 			// errors already handled
@@ -160,16 +163,26 @@ func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 	}
 
 	if noOp {
+		close(workIn)
 		log.Fatal("Halting.  No-op mode enganged.")
 	}
 
 	// Queue up and process work
 	c := 0
+	t := time.Now().Unix()
 	for work := range jobs {
 		workIn <- jobs[work]
 		c++
 		if c%10 == 0 {
-			log.Printf("Progress %d / %d: %.2f", c, l, 100*float64(c)/float64(l))
+			now := time.Now().Unix()
+			s := now - t
+			if s == 0 {
+				s = 1
+			}
+			log.Printf("Progress %d / %d: %.2f  Metrics/second: %.2f",
+				c, l,
+				100*float64(c)/float64(l),
+				float64(c)/float64(s))
 		}
 	}
 

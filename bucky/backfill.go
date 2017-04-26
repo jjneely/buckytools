@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 // import "github.com/jjneely/buckytools/hashing"
@@ -58,9 +59,11 @@ DBs to the remote servers.`
 
 func backfillWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
 	for work := range workIn {
-		log.Printf("Backfilling [%s] %s => [%s] %s",
-			work.oldLocation, work.oldName,
-			work.newLocation, work.newName)
+		if Verbose {
+			log.Printf("Backfilling [%s] %s => [%s] %s",
+				work.oldLocation, work.oldName,
+				work.newLocation, work.newName)
+		}
 		metric, err := GetMetricData(work.oldLocation, work.oldName)
 		if err != nil {
 			// errors already handled
@@ -116,6 +119,7 @@ func BackfillMetrics(metricMap map[string]string) error {
 
 	c := 0
 	l := len(backfillJob)
+	t := time.Now().Unix()
 	for m, server := range backfillJob {
 		work := new(MigrateWork)
 		work.oldName = m
@@ -126,7 +130,15 @@ func BackfillMetrics(metricMap map[string]string) error {
 		workIn <- work
 		c++
 		if c%10 == 0 {
-			log.Printf("Progress %d / %d: %.2f", c, l, 100*float64(c)/float64(l))
+			now := time.Now().Unix()
+			s := now - t
+			if s == 0 {
+				s = 1
+			}
+			log.Printf("Progress %d / %d: %.2f  Metrics/second: %.2f",
+				c, l,
+				100*float64(c)/float64(l),
+				float64(c)/float64(s))
 		}
 	}
 
