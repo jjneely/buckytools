@@ -13,9 +13,7 @@ import (
 	"time"
 )
 
-// We've vendored golang.org/x/crypto/ssh/terminal for ease of Debian
-// packaging.  No modifications present.  -- Jack Neely, 2015/07/06
-import "github.com/jjneely/buckytools/terminal"
+import "github.com/golang/crypto/ssh/terminal"
 import "github.com/jjneely/buckytools/metrics"
 
 var metricWorkers int
