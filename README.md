@@ -99,19 +99,22 @@ pass to the daemon as arguments the members of the consistent hash ring.
 
     setuid graphite
 
-    exec /path/to/buckyd --node graphite010-g5 \
-        -b 192.168.1.1:5678 \
+    exec /path/to/buckyd -node graphite010-g5 \
+        -sparse -hash carbon -b 192.168.1.1:5678 \
 	graphite010-g5:a graphite010-g5:b \
 	graphite011-g5:a graphite011-g5:b \
 	graphite012-g5:a graphite012-g5:b
 
-Here `--node` is the name of this Graphite node (if different from what
-is derived from the host name).  `-b` or `--bind` is the address to bind
-to.  You can also specify `--prefix`` where your Whisper data store is
-and `--tmpdir` where the daemon can write temporary files.  The following
-non-option arguments are the servers and instances that make up the hashring.
-Order is important.  The hashring members can be specified in the following
-formats:
+Here `-node` is the name of this Graphite node in the hashring (if different
+from what is derived from the host name).  `-b` or `-bind` is the address to
+bind to.  You can also specify `-prefix`` where your Whisper data store is and
+`-tmpdir` where the daemon can write temporary files.  The `-sparse` option
+instructs buckyd to create sparse whisper files that take less disk space.
+The `-hash` option chooses the hashring algorithm.
+
+The non-option arguments
+are the servers and instances that make up the hashring.  Order is important.
+The hashring members can be specified in the following formats:
 
 * `SERVER`
 * `SERVER:INSTANCE`
@@ -147,15 +150,33 @@ Other common flags are:
 Examples
 ========
 
-Rebalance a cluster with newly added storage nodes:
+Rebalance a cluster with newly added storage nodes.  Check if you need to
+use the `-no-delete` flag.  The default behavior is to move metrics and
+delete the source after a successful copy.
 
-    GOMAXPROCS=4 bucky rebalance -h graphite010-g5:4242 \
-        -w 100 2>&1 | tee rebalance.log
+    $ bucky rebalance -h graphite010-g5:4242 \
+        -w 25 2>&1 | tee rebalance.log
 
 Discover the exact storage used by a set of metrics:
 
-    export BUCKYHOST=-h graphite010-g5:4242
-    bucky du -r '^1min\.ipvs\.'
+    $ export BUCKYHOST=-h graphite010-g5:4242
+    $ bucky du -r '^1min\.ipvs\.'
+
+Make a backup of all of the metrics in the `carbon` namespace.  Using the
+[pigz][2] parallel gzip compression tool.  (Normal gzip would otherwise bottleneck
+the process.)
+
+    $ bucky tar -w 25 -r '^carbon\.' | pigz > filename.tar
+
+Backfill or rename metrics with a JSON hash of old name to new name.  This
+does not delete the source metric.  It is a copy/fill operation.
+
+    $ bucky backfill -w 25 foo.json
+
+Find inconsistent metrics or metrics that are in the wrong place in the
+cluster according to the hashring:
+
+    $ bucky inconsistent
 
 Notes
 =====
@@ -177,20 +198,26 @@ cron job similar to this:
 This checks that the directory has not been modified in more than 1 day
 which, in most cases, avoids race conditions.
 
-To Do / Bugs
-============
+Google Snappy Compression
+-------------------------
 
+To further scale the speed at which this tool will move metric data from
+one location to another it uses Snappy compression by default.  This can be
+disabled with the `-no-encoding` flag.  When using many workers this can
+double (or more) the throughput.  The Snappy compression frame protocol also
+handles CRC checks for data integrity.
+
+To Do / Bugs / Contributing
+===========================
+
+Contributions are welcome!  Please make a GitHub pull request.  Below are
+some low hanging fruit (and some more annoying issues) that need help.
+
+* Unit tests with Go's `net/http/httptest` package.  Test that the buckyd
+  daemon manipulates the on disk Whisper files correctly.
 * Authentication -- Negotiate and Kerberos support.  Probably Basic as well.
-* Code clean up -- I wrote a lot of this quickly, it needs love in a
-  lot of places.
-* tests
 * Make all modules aware of possible duplicate metrics.
-* Speed testing and improvements.
-* Move the lower level GET, POST, DELETE, HEAD functions into a single
-  common file/place.
 * Retries
-* Rebalance needs to optionally be aware of machines not in the hash ring that
-  the rebalance should vacate.
 * Graceful restarts and shutdowns?  https://github.com/facebookgo/grace
 * graphite-project/carbon's master branch contains this change:
 
@@ -199,4 +226,8 @@ To Do / Bugs
   This will cause a few metrics to be assigned a different position in the
   hash ring.  We need to account for this algorithm change somehow.
 
+  Buckytools supports multiple different hashing algorithms and this can be
+  setup as a different support hashing type.
+
 [1]: https://github.com/grobian/carbon-c-relay
+[2]: http://zlib.net/pigz/
