@@ -3,14 +3,20 @@
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
-export GO15VENDOREXPERIMENT := 1
 export DH_OPTIONS
 export DH_GOPKG := github.com/jjneely/buckytools
 
 DEBPKGNAME ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Source: //p')
+BUILDDIR   := $(shell perl -w -MDebian::Debhelper::Buildsystem::golang -e \
+	'print Debian::Debhelper::Buildsystem::golang->new()->get_builddir()')
 
 %:
 	dh $@ --buildsystem=golang --with=golang
+
+override_dh_auto_configure:
+	dh_auto_configure -O--buildsystem=golang
+	# Copy assembly and test fixtures because dh-golang sucks
+	cp -av vendor $(BUILDDIR)/src/$(DH_GOPKG)/
 
 override_dh_auto_install:
 	dh_auto_install

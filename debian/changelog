@@ -1,3 +1,11 @@
+buckytools (0.3.0) unstable; urgency=medium
+
+  * Package 0.3.0 adding Google Snappy compression support
+  * Verbose flag and cleanups of logging
+  * Much code clean up and unification
+
+ -- Jack Neely <jjneely@42lines.net>  Thu, 27 Apr 2017 16:06:45 -0400
+
 buckytools (0.2.0) unstable; urgency=medium
 
   * Package 0.2.0 with jump support

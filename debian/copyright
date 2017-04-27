@@ -14,15 +14,15 @@ License: MIT
 
 Files: whisper/*
 Copyright: 2012 Rob Young
-License: BSD
+License: BSD-3-clause
 
 Files: terminal/*
 Copyright: 2011 The Go Authors.
-License: BSD
+License: BSD-3-clause
 
 Files: pickle/*
 Copyright: 2013 Kamil Kisiel
-License: BSD
+License: BSD-3-clause
 
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a
@@ -43,7 +43,7 @@ License: MIT
  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-License BSD:
+License: BSD-3-clause
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are
   met:

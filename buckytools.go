@@ -6,7 +6,7 @@ import (
 
 const (
 	// Buckytools suite version
-	Version = "0.2.0"
+	Version = "0.3.0"
 )
 
 // SupportedHashTypes is the string identifiers of the hashing algorithms
