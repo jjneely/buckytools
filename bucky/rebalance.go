@@ -179,10 +179,11 @@ func RebalanceMetrics(noDelete bool, extraHostPorts []string) error {
 			if s == 0 {
 				s = 1
 			}
-			log.Printf("Progress %d / %d: %.2f  Metrics/second: %.2f",
+			log.Printf("Progress %d / %d: %.2f  Metrics/second: %.2f  Delete: %t",
 				c, l,
 				100*float64(c)/float64(l),
-				float64(c)/float64(s))
+				float64(c)/float64(s),
+				!noDelete)
 		}
 	}
 
