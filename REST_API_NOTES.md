@@ -40,6 +40,12 @@ Methods:
   data point is null.  See Carbonate's whisper-fill.py.
 * DELETE - Remove this metric from the file system.
 
+GET requests will encode the response with Google's Snappy compression
+algorithm when the header "Accept-Encoding: snappy" is present in the
+headers of the GET request.  PUT and POST accept "Content-Encoding: snappy"
+for Snappy compressed Whisper data as well.  Otherwise, the identity
+encoding is assumed.  Encoding requests have no affect on HEAD or DELETE.
+
 /hashring
 ---------
 
