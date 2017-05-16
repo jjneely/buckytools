@@ -178,6 +178,24 @@ cluster according to the hashring:
 
     $ bucky inconsistent
 
+Building from Source
+====================
+
+To build from the Go source:
+
+* Make sure your `GOPATH` environment variable is set to your Go
+  [workspace][3].
+* Run: `go get github.com/jjneely/buckytools`
+* Change directory into `$GOPATH/src/github.com/jjneely/buckytools`
+* Run: `go install ./...`
+* Binaries should now be installed to `$GOPATH/bin`
+
+This can also be built as a Debian/Ubuntu package.  (Tested on Ubuntu Trusty,
+and Xenial.)  The [git-buildpackage][4] is what I use to produce builds.
+This requires `golang` debian packages.
+
+* Run: `gbp buildpackage`
+
 Notes
 =====
 
@@ -231,3 +249,5 @@ some low hanging fruit (and some more annoying issues) that need help.
 
 [1]: https://github.com/grobian/carbon-c-relay
 [2]: http://zlib.net/pigz/
+[3]: https://golang.org/doc/code.html
+[4]: http://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.html
