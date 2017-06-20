@@ -97,9 +97,20 @@ func writeTar(workOut chan *metrics.MetricData, wg *sync.WaitGroup) {
 }
 
 func getMetricWorker(workIn chan *MetricWork, workOut chan *metrics.MetricData, wg *sync.WaitGroup) {
+	var data []byte
 	for w := range workIn {
 		metric, err := GetMetricData(w.Server, w.Name)
+		if err != nil {
+			workerErrors = true
+			continue
+		}
+
+		// Decompress the metric here so that we store uncompressed data
+		// in the tar file which can then be better compressed.
+		data, err = MetricDecode(metric)
 		if err == nil {
+			metric.Data = data
+			metric.Encoding = metrics.EncIdentity
 			workOut <- metric
 		} else {
 			workerErrors = true

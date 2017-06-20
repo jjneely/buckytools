@@ -93,6 +93,7 @@ func MetricEncode(metric *MetricData, encoding int) error {
 	}
 	writer.Close()
 	metric.Data = buf.Bytes()
+	metric.Encoding = EncSnappy
 
 	return nil
 }

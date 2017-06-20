@@ -106,6 +106,7 @@ func RestoreTar(servers []string, fd *os.File) error {
 		metric.Size = hdr.Size
 		metric.Mode = hdr.Mode
 		metric.ModTime = hdr.ModTime.Unix()
+		metric.Encoding = EncIdentity
 
 		if _, err := io.Copy(buf, tr); err != nil {
 			log.Printf("Error reading data from tar: %s", err)
@@ -116,6 +117,7 @@ func RestoreTar(servers []string, fd *os.File) error {
 			log.Printf("Error: Data from tar file not the correct size.")
 			return fmt.Errorf("Data from tar file not the correct size.")
 		}
+		// XXX: Snappy Compress for transit?
 		workIn <- metric
 	}
 
