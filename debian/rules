@@ -16,7 +16,7 @@ BUILDDIR   := $(shell perl -w -MDebian::Debhelper::Buildsystem::golang -e \
 override_dh_auto_configure:
 	dh_auto_configure -O--buildsystem=golang
 	# Copy assembly and test fixtures because dh-golang sucks
-	cp -av vendor $(BUILDDIR)/src/$(DH_GOPKG)/
+	cp -fa vendor cmd $(BUILDDIR)/src/$(DH_GOPKG)/
 
 override_dh_auto_install:
 	dh_auto_install

@@ -1,3 +1,13 @@
+buckytools (0.3.1) unstable; urgency=medium
+
+  * Invert default behavior for deleting metrics in rebalance
+  * Fix tar/restore after Snappy changes
+  * Unit tests for bucky-pickle-relay
+  * Conform to Go best practices for repo layout
+  * Update vendored packages
+
+ -- Jack Neely <jjneely@42lines.net>  Wed, 21 Jun 2017 13:24:37 -0400
+
 buckytools (0.3.0) unstable; urgency=medium
 
   * Package 0.3.0 adding Google Snappy compression support
