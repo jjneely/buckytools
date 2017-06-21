@@ -1,3 +1,12 @@
+buckytools (0.3.2) unstable; urgency=medium
+
+  * Support ogorek.Tuple types in parsing of pickle objects.  This
+    was added to ogorek when I updated the vendoring so that from Go
+    Tuples and Lists were different objects.
+  * Fix up tests
+
+ -- Jack Neely <jjneely@42lines.net>  Wed, 21 Jun 2017 17:28:58 -0400
+
 buckytools (0.3.1) unstable; urgency=medium
 
   * Invert default behavior for deleting metrics in rebalance
