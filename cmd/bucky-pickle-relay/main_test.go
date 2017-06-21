@@ -52,13 +52,27 @@ func TestUnMarshal(t *testing.T) {
 			continue
 		}
 		lines := strings.Split(string(blob), "\n")
+		for i := 0; i < len(lines); {
+			if strings.TrimSpace(lines[i]) == "" {
+				// delete element, preserve order
+				lines = append(lines[:i], lines[i+1:]...)
+			} else {
+				i++
+			}
+		}
 
 		// Actually run our code
 		decode := decodePickle(pickle)
 
 		// Validation
-		for i, s := range decode {
-			if s != strings.TrimSpace(lines[i]) {
+		for i, s := range lines {
+			if i >= len(decode) {
+				t.Errorf("Data point not decoded: %s", s)
+				continue
+			} else {
+				t.Logf("Decoded: %s", decode[i])
+			}
+			if strings.TrimSpace(s) != decode[i] {
 				t.Errorf("Graphite line strings don't match:  %s != %s",
 					s, strings.TrimSpace(lines[i]))
 			}

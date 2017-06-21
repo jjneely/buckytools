@@ -251,36 +251,50 @@ func decodePickle(buff []byte) []string {
 		return nil
 	}
 
+	var slice []interface{}
 	// Is this a slice -- it should be
-	slice, ok := object.([]interface{})
-	if !ok {
+	switch t := object.(type) {
+	case []interface{}:
+		slice = t
+	case pickle.Tuple:
+		slice = []interface{}(t)
+	default:
 		log.Printf("Dropping pickle object: Should be []interface{} and is %T", object)
 		return nil
 	}
 
 	for _, v := range slice {
+		var metric, datapoint []interface{}
 		var key, ts, dp string
-		metric, ok := v.([]interface{})
-		if !ok {
+		switch t := v.(type) {
+		case []interface{}:
+			metric = t
+		case pickle.Tuple:
+			metric = []interface{}(t)
+		default:
 			log.Printf("Dropping metric: []interface{} not data type inside pickle slice, rather %T", v)
 			continue
 		}
 
-		key, ok = metric[0].(string)
+		key, ok := metric[0].(string)
 		if !ok {
 			log.Printf("Dropping metric: Unexpected %T type where metric key string should be", metric[0])
 			continue
 		}
 
-		datatuple, ok := metric[1].([]interface{})
-		if !ok {
+		switch t := metric[1].(type) {
+		case []interface{}:
+			datapoint = t
+		case pickle.Tuple:
+			datapoint = []interface{}(t)
+		default:
 			log.Printf("Dropping metric: ts, dp []interface{} not found, rather %T", metric[1])
 			continue
 		}
 
-		switch t := datatuple[0].(type) {
+		switch t := datapoint[0].(type) {
 		default:
-			log.Printf("Dropping metric: Unexpected type %T in timestamp for %s", datatuple[0], key)
+			log.Printf("Dropping metric: Unexpected type %T in timestamp for %s", datapoint[0], key)
 			continue
 		case string:
 			ts = strings.TrimSpace(t)
@@ -292,9 +306,9 @@ func decodePickle(buff []byte) []string {
 			ts = fmt.Sprintf("%d", t)
 		}
 
-		switch t := datatuple[1].(type) {
+		switch t := datapoint[1].(type) {
 		default:
-			log.Printf("Dropping metric: Unexpected type %T in value for %s", datatuple[1], key)
+			log.Printf("Dropping metric: Unexpected type %T in value for %s", datapoint[1], key)
 			continue
 		case string:
 			dp = strings.TrimSpace(t)
@@ -411,7 +425,7 @@ func main() {
 		usage()
 	}
 
-	log.Printf("bucky-pickle-relay Copyright 2015 42 Lines, Inc.")
+	log.Printf("bucky-pickle-relay Copyright 2015-2017 42 Lines, Inc.")
 	carbonRelay = flag.Arg(0)
 	log.Printf("Sending line protocol data to %s", carbonRelay)
 	log.Printf("Reporting internal metrics under %s", prefix)

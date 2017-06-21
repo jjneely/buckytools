@@ -3,7 +3,7 @@
 import pickle
 import time
 
-from types import FloatType
+from types import StringType, FloatType, ListType, TupleType
 
 def ts():
     return time.time()
@@ -43,6 +43,11 @@ data = {
                      ( "test.004", ( ts(), (1<<64) + 2 ) ),
                    ],
 
+    "test.006"   : ( [ "test.001", [ int(ts()), 3.14 ] ],
+                     [ "test.002", [ int(ts()), 43 ] ],
+                     [ "test.003", ( int(ts()), 44 ) ],
+                     ( "test.004", ( int(ts()), 45 ) ),
+                   ),
 }
 
 if __name__ == "__main__":
@@ -50,17 +55,29 @@ if __name__ == "__main__":
         with open("%s.pickle" % key, 'w') as fd:
             pickle.dump(data[key], fd)
         with open("%s.line" % key, 'w') as fd:
-            if type(data[key]) != type([]) and type(data[key]) != type(()):
+            if type(data[key]) != ListType and type(data[key]) != TupleType:
                 continue
             for l in data[key]:
-                try:
-                    if type(l[1][0]) == FloatType:
-                        l[1][0] = "%.12f" % l[1][0]
-                    if type(l[1][1]) == FloatType:
-                        l[1][1] = "%.12f" % l[1][1]
-                    if type(l[0]) == type(""):
-                        s = "%s %s %s\n" % (l[0], l[1][1], l[1][0])
-                        fd.write(s)
-                except:
-                    pass
+                if len(l) != 2:
+                    continue  # invalid pickle format will be dropped
+                if type(l[0]) != StringType:
+                    continue
+                if type(l[1]) != ListType and type(l[1]) != TupleType:
+                    continue
+                if len(l[1]) != 2:
+                    continue
+
+                # Format floats the way Go will
+                dp = []
+                if type(l[1][0]) == FloatType:
+                    dp.append("%.12f" % l[1][0])
+                else:
+                    dp.append(l[1][0])
+                if type(l[1][1]) == FloatType:
+                    dp.append("%.12f" % l[1][1])
+                else:
+                    dp.append(l[1][1])
+
+                s = "%s %s %s\n" % (l[0], dp[1], dp[0])
+                fd.write(s)
 
