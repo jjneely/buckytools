@@ -68,6 +68,8 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 	switch master.Algo {
 	case "carbon":
 		Cluster.Hash = hashing.NewCarbonHashRing()
+	case "fnv1a":
+		Cluster.Hash = hashing.NewFNV1aHashRing()
 	case "jump_fnv1a":
 		Cluster.Hash = hashing.NewJumpHashRing(master.Replicas)
 	default:
