@@ -13,6 +13,7 @@ const (
 // used for the consistent hash ring.  This slice must be sorted.
 var SupportedHashTypes = []string{
 	"carbon",
+	"fnv1a",
 	"jump_fnv1a",
 }
 

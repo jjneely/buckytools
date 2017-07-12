@@ -7,57 +7,57 @@ import (
 
 func makeRing() *CarbonHashRing {
 	hr := NewCarbonHashRing()
-	hr.AddNode(NewNode("graphite010-g5", "a"))
-	hr.AddNode(NewNode("graphite010-g5", "b"))
-	hr.AddNode(NewNode("graphite010-g5", "c"))
+	hr.AddNode(NewNode("graphite010-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite010-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite010-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite011-g5", "a"))
-	hr.AddNode(NewNode("graphite011-g5", "b"))
-	hr.AddNode(NewNode("graphite011-g5", "c"))
+	hr.AddNode(NewNode("graphite011-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite011-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite011-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite012-g5", "a"))
-	hr.AddNode(NewNode("graphite012-g5", "b"))
-	hr.AddNode(NewNode("graphite012-g5", "c"))
+	hr.AddNode(NewNode("graphite012-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite012-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite012-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite013-g5", "a"))
-	hr.AddNode(NewNode("graphite013-g5", "b"))
-	hr.AddNode(NewNode("graphite013-g5", "c"))
+	hr.AddNode(NewNode("graphite013-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite013-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite013-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite014-g5", "a"))
-	hr.AddNode(NewNode("graphite014-g5", "b"))
-	hr.AddNode(NewNode("graphite014-g5", "c"))
+	hr.AddNode(NewNode("graphite014-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite014-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite014-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite015-g5", "a"))
-	hr.AddNode(NewNode("graphite015-g5", "b"))
-	hr.AddNode(NewNode("graphite015-g5", "c"))
+	hr.AddNode(NewNode("graphite015-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite015-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite015-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite016-g5", "a"))
-	hr.AddNode(NewNode("graphite016-g5", "b"))
-	hr.AddNode(NewNode("graphite016-g5", "c"))
+	hr.AddNode(NewNode("graphite016-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite016-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite016-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite017-g5", "a"))
-	hr.AddNode(NewNode("graphite017-g5", "b"))
-	hr.AddNode(NewNode("graphite017-g5", "c"))
+	hr.AddNode(NewNode("graphite017-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite017-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite017-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite018-g5", "a"))
-	hr.AddNode(NewNode("graphite018-g5", "b"))
-	hr.AddNode(NewNode("graphite018-g5", "c"))
+	hr.AddNode(NewNode("graphite018-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite018-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite018-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite-data019-g5", "a"))
-	hr.AddNode(NewNode("graphite-data019-g5", "b"))
-	hr.AddNode(NewNode("graphite-data019-g5", "c"))
+	hr.AddNode(NewNode("graphite-data019-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite-data019-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite-data019-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite-data020-g5", "a"))
-	hr.AddNode(NewNode("graphite-data020-g5", "b"))
-	hr.AddNode(NewNode("graphite-data020-g5", "c"))
+	hr.AddNode(NewNode("graphite-data020-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite-data020-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite-data020-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite-data021-g5", "a"))
-	hr.AddNode(NewNode("graphite-data021-g5", "b"))
-	hr.AddNode(NewNode("graphite-data021-g5", "c"))
+	hr.AddNode(NewNode("graphite-data021-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite-data021-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite-data021-g5", 0, "c"))
 
-	hr.AddNode(NewNode("graphite-data022-g5", "a"))
-	hr.AddNode(NewNode("graphite-data022-g5", "b"))
-	hr.AddNode(NewNode("graphite-data022-g5", "c"))
+	hr.AddNode(NewNode("graphite-data022-g5", 0, "a"))
+	hr.AddNode(NewNode("graphite-data022-g5", 0, "b"))
+	hr.AddNode(NewNode("graphite-data022-g5", 0, "c"))
 
 	return hr
 }
@@ -66,7 +66,7 @@ func TestEmptyInstance(t *testing.T) {
 	hr := NewCarbonHashRing()
 
 	for _, s := range []string{"test01", "test02"} {
-		n := NewNode(s, "")
+		n := NewNode(s, 0, "")
 		hr.AddNode(n)
 	}
 
@@ -84,12 +84,12 @@ func TestEmptyInstance(t *testing.T) {
 }
 
 func TestNewNode(t *testing.T) {
-	n := NewNode("graphite010-g5", "a")
+	n := NewNode("graphite010-g5", 0, "a")
 	if n.KeyValue() != "('graphite010-g5', 'a')" {
 		t.Error("NewNode() did not produce a tuple string format")
 	}
 
-	if NewNode("graphite011-g5", "").KeyValue() != "('graphite011-g5', None)" {
+	if NewNode("graphite011-g5", 0, "").KeyValue() != "('graphite011-g5', None)" {
 		t.Error("NewNode() did not handle a None instance value")
 	}
 
@@ -113,7 +113,7 @@ func TestNewHashRing(t *testing.T) {
 		t.Error("HashRing replica setting error")
 	}
 
-	n := NewNode("a", "a")
+	n := NewNode("a", 0, "a")
 	hr.AddNode(n)
 	if hr.String() != "[carbon: 1 nodes, 5 replicas, 5 ring members a:a]" {
 		t.Error("HashRing string representation or AddNode()")

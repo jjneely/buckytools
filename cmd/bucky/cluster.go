@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -78,12 +79,34 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 		// There are two formats for the hashring here -- INSTANCE is optional
 		// 1) SERVER:INSTANCE
 		// 2) SERVER
+		// 3) SERVER:PORT:INSTANCE
+		// 4) SERVER:PORT
 		fields := strings.Split(v, ":")
 		Cluster.Servers = append(Cluster.Servers, fields[0])
-		if len(fields) < 2 {
+		if len(fields) == 1 {
+			fields = append(fields, "2003")
 			fields = append(fields, "")
+		} else if len(fields) == 2 {
+			_, err := strconv.Atoi(fields[1])
+			if err != nil {
+				// assume instance
+				fields = append(fields, fields[1])
+				fields[1] = "2003"
+			} else {
+				fields = append(fields, "")
+			}
+		} else {
+			// 3 or more fields
+			fields = fields[:3]
 		}
-		Cluster.Hash.AddNode(hashing.Node{fields[0], fields[1]})
+		if fields[1] == "" {
+			fields[1] = "2003"
+		}
+		port, err := strconv.ParseUint(fields[1], 10, 16)
+		if err != nil {
+			port = 2003
+		}
+		Cluster.Hash.AddNode(hashing.Node{fields[0], uint(port), fields[2]})
 	}
 
 	members := make([]*JSONRingType, 0)

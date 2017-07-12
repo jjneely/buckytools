@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -98,12 +99,33 @@ func makeRing(config []string) *hashing.CarbonHashRing {
 	hr := hashing.NewCarbonHashRing()
 	for _, n := range config {
 		fields := strings.Split(n, ":")
-		if len(fields) < 2 {
+		if len(fields) == 1 {
+			fields = append(fields, "2003")
 			fields = append(fields, uuid.New())
-		} else if fields[1] == "" {
-			fields[1] = uuid.New()
+		} else if len(fields) == 2 {
+			_, err := strconv.Atoi(fields[1])
+			if err != nil {
+				// assume instance
+				fields = append(fields, fields[1])
+				fields[1] = "2003"
+			} else {
+				fields = append(fields, uuid.New())
+			}
+		} else {
+			// 3 or more fields
+			fields = fields[:3]
 		}
-		hr.AddNode(hashing.NewNode(fields[0], fields[1]))
+		if fields[1] == "" {
+			fields[1] = "2003"
+		}
+		if fields[2] == "" {
+			fields[2] = uuid.New()
+		}
+		port, err := strconv.ParseUint(fields[1], 10, 16)
+		if err != nil {
+			port = 2003
+		}
+		hr.AddNode(hashing.NewNode(fields[0], uint(port), fields[2]))
 	}
 
 	return hr
