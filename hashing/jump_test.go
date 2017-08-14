@@ -74,7 +74,7 @@ var jumpHashTestNodes = []string{
 func makeJumpTestCHR(r int) *JumpHashRing {
 	chr := NewJumpHashRing(r)
 	for _, v := range jumpHashTestNodes {
-		chr.AddNode(Node{v, ""})
+		chr.AddNode(Node{v, 0, ""})
 	}
 
 	return chr
@@ -83,7 +83,7 @@ func makeJumpTestCHR(r int) *JumpHashRing {
 func makeJumpTestCHRWithInstanceName(r int) *JumpHashRing {
 	chr := NewJumpHashRing(r)
 	for _, v := range jumpHashTestNodesWithInstanceName {
-		chr.AddNode(Node{v[0], v[1]})
+		chr.AddNode(Node{v[0], 0, v[1]})
 	}
 	return chr
 }

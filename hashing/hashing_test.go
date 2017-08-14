@@ -85,11 +85,11 @@ func TestEmptyInstance(t *testing.T) {
 
 func TestNewNode(t *testing.T) {
 	n := NewNode("graphite010-g5", 0, "a")
-	if n.KeyValue() != "('graphite010-g5', 'a')" {
+	if n.CarbonKeyValue() != "('graphite010-g5', 'a')" {
 		t.Error("NewNode() did not produce a tuple string format")
 	}
 
-	if NewNode("graphite011-g5", 0, "").KeyValue() != "('graphite011-g5', None)" {
+	if NewNode("graphite011-g5", 0, "").CarbonKeyValue() != "('graphite011-g5', None)" {
 		t.Error("NewNode() did not handle a None instance value")
 	}
 

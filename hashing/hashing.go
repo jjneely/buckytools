@@ -2,9 +2,7 @@ package hashing
 
 import (
 	"crypto/md5"
-	"encoding/binary"
 	"fmt"
-	"hash/fnv"
 	//"log"
 	//"os"
 	"strings"
@@ -62,26 +60,9 @@ type CarbonHashRing struct {
 	replicas int
 }
 
-// FNV1aHashRing represents carbon-c-relay's more efficient hash variant
-// of CarbonHashRing
-type FNV1aHashRing struct {
-	ring     []RingEntry
-	nodes    []Node
-	replicas int
-}
-
 // NewCarbonHashRing sets up a new CarbonHashRing and returns it.
 func NewCarbonHashRing() *CarbonHashRing {
 	var chr = new(CarbonHashRing)
-	chr.ring = make([]RingEntry, 0, 10)
-	chr.nodes = make([]Node, 0, 10)
-	chr.replicas = 100
-
-	return chr
-}
-
-func NewFNV1aHashRing() *FNV1aHashRing {
-	var chr = new(FNV1aHashRing)
 	chr.ring = make([]RingEntry, 0, 10)
 	chr.nodes = make([]Node, 0, 10)
 	chr.replicas = 100
@@ -108,16 +89,6 @@ func computeCarbonRingPosition(key string) (result int) {
 	for _, v := range digest[:2] {
 		result = (result << 8) + int(v)
 	}
-	return
-}
-
-func computeFNV1aRingPosition(key string) (result int) {
-	// compute 32-bits FNV1a hash
-	hash := fnv.New32a()
-	digest := binary.BigEndian.Uint32(hash.Sum([]byte(key)))
-
-	// and trim it to the 16bit space
-	result = int((digest >> 16) ^ (digest & uint32(0xFFFF)))
 	return
 }
 
@@ -209,19 +180,12 @@ func (t Node) CarbonKeyValue() string {
 	return fmt.Sprintf("('%s', '%s')", t.Server, t.Instance)
 }
 
-func (t Node) FNV1aKeyValue() string {
-	if t.Instance == "" {
-		return fmt.Sprintf("%s:%u", t.Server, t.Port)
-	}
-	return fmt.Sprintf("%s", t.Instance)
-}
-
 // Node.String returns a string representation of the Node struct
 func (t Node) String() string {
 	if t.Instance == "" {
-		return fmt.Sprintf("%s:%u:None", t.Server, t.Port)
+		return fmt.Sprintf("%s:None", t.Server)
 	}
-	return fmt.Sprintf("%s:%u:%s", t.Server, t.Port, t.Instance)
+	return fmt.Sprintf("%s:%s", t.Server, t.Instance)
 }
 
 func (t *CarbonHashRing) String() string {
@@ -234,29 +198,11 @@ func (t *CarbonHashRing) String() string {
 		len(t.nodes), t.replicas, len(t.ring), strings.Join(servers, " "))
 }
 
-func (t *FNV1aHashRing) String() string {
-	servers := make([]string, 0)
-
-	for i := 0; i < len(t.nodes); i++ {
-		servers = append(servers, t.nodes[i].String())
-	}
-	return fmt.Sprintf("[fnv1a: %d nodes, %d replicas, %d ring members %s]",
-		len(t.nodes), t.replicas, len(t.ring), strings.Join(servers, " "))
-}
-
 func (t *CarbonHashRing) Replicas() int {
 	return t.replicas
 }
 
-func (t *FNV1aHashRing) Replicas() int {
-	return t.replicas
-}
-
 func (t *CarbonHashRing) SetReplicas(r int) {
-	t.replicas = r
-}
-
-func (t *FNV1aHashRing) SetReplicas(r int) {
 	t.replicas = r
 }
 
@@ -272,41 +218,7 @@ func (t *CarbonHashRing) AddNode(node Node) {
 	}
 }
 
-func (t *FNV1aHashRing) AddNode(node Node) {
-	//log.Printf("insertRing(): %s", node.FNV1aKeyValue())
-	t.nodes = append(t.nodes, node)
-	for i := 0; i < t.replicas; i++ {
-		var e RingEntry
-		replica_key := fmt.Sprintf("%d-%s", node.FNV1aKeyValue(), i)
-		e.position = computeFNV1aRingPosition(replica_key)
-		e.node = node
-		t.ring = insertRing(t.ring, e)
-	}
-}
-
 func (t *CarbonHashRing) RemoveNode(node Node) {
-	var i int
-
-	// Find node in nodes
-	for i = 0; i < len(t.nodes); {
-		if node.String() == t.nodes[i].String() {
-			t.nodes = append(t.nodes[:i], t.nodes[i+1:]...)
-		} else {
-			i++
-		}
-	}
-
-	// Remove matching ring locations
-	for i = 0; i < len(t.ring); {
-		if node.String() == t.ring[i].node.String() {
-			t.ring = append(t.ring[:i], t.ring[i+1:]...)
-		} else {
-			i++
-		}
-	}
-}
-
-func (t *FNV1aHashRing) RemoveNode(node Node) {
 	var i int
 
 	// Find node in nodes
@@ -346,24 +258,6 @@ func (t *CarbonHashRing) GetNode(key string) Node {
 	return t.ring[i].node
 }
 
-func (t *FNV1aHashRing) GetNode(key string) Node {
-	if len(t.ring) == 0 {
-		panic("HashRing is empty")
-	}
-
-	e := RingEntry{computeFNV1aRingPosition(key), NewNode(key, 0, "")}
-	i := mod(bisectLeft(t.ring, e), len(t.ring))
-	//log.Printf("len(ring) = %d", len(t.ring))
-	//log.Printf("Bisect index for %s is %d", key, i)
-	//log.Printf("Ring position for %s is %x", key, e.position)
-	//fd, _ := os.Create("ring.golang")
-	//for r := range t.ring {
-	//	fd.Write([]byte(fmt.Sprintf("%s:%x\n", t.ring[r].node.FNV1aKeyValue(), t.ring[r].position)))
-	//}
-	//fd.Close()
-	return t.ring[i].node
-}
-
 func (t *CarbonHashRing) GetNodes(key string) []Node {
 	if len(t.ring) == 0 {
 		panic("HashRing is empty")
@@ -372,29 +266,6 @@ func (t *CarbonHashRing) GetNodes(key string) []Node {
 	result := make([]Node, 0)
 	seen := make(map[string]bool)
 	e := RingEntry{computeCarbonRingPosition(key), NewNode(key, 0, "")}
-	index := mod(bisectLeft(t.ring, e), len(t.ring))
-	last := index - 1
-
-	for len(seen) < len(t.nodes) && index != last {
-		next := t.ring[index]
-		if !seen[next.node.String()] {
-			seen[next.node.String()] = true
-			result = append(result, next.node)
-		}
-		index = mod((index + 1), len(t.ring))
-	}
-
-	return result
-}
-
-func (t *FNV1aHashRing) GetNodes(key string) []Node {
-	if len(t.ring) == 0 {
-		panic("HashRing is empty")
-	}
-
-	result := make([]Node, 0)
-	seen := make(map[string]bool)
-	e := RingEntry{computeFNV1aRingPosition(key), NewNode(key, 0, "")}
 	index := mod(bisectLeft(t.ring, e), len(t.ring))
 	last := index - 1
 
@@ -433,44 +304,13 @@ func (t *CarbonHashRing) BucketsPerNode() map[string]int {
 	return hash
 }
 
-func (t *FNV1aHashRing) BucketsPerNode() map[string]int {
-	if len(t.ring) == 0 {
-		panic("HashRing is empty")
-	}
-
-	hash := make(map[string]int)
-	max := 0xFFFF
-	last := t.ring[len(t.ring)-1]
-	for i, e := range t.ring {
-		buckets := 0
-		if i == 0 {
-			buckets = (max - last.position) + e.position
-		} else {
-			buckets = e.position - last.position
-		}
-
-		hash[e.node.String()] = hash[e.node.String()] + buckets
-		last = e
-	}
-
-	return hash
-}
-
 // Len return the number of buckets or nodes in the hash ring.
 func (t *CarbonHashRing) Len() int {
 	return len(t.nodes)
 }
 
-func (t *FNV1aHashRing) Len() int {
-	return len(t.nodes)
-}
-
 // Nodes returns the nodes in the carbon hash ring
 func (t *CarbonHashRing) Nodes() []Node {
-	return t.nodes
-}
-
-func (t *FNV1aHashRing) Nodes() []Node {
 	return t.nodes
 }
 
