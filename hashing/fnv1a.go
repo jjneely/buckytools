@@ -38,7 +38,7 @@ func computeFNV1aRingPosition(key string) (result int) {
 
 func (t Node) FNV1aKeyValue() string {
 	if t.Instance == "" {
-		return fmt.Sprintf("%s:%u", t.Server, t.Port)
+		return fmt.Sprintf("%s:%d", t.Server, t.Port)
 	}
 	return fmt.Sprintf("%s", t.Instance)
 }
