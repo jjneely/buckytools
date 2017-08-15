@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
-	"strings"
 )
 
 import "github.com/jjneely/buckytools/hashing"
-import . "github.com/jjneely/buckytools"
 
 type ClusterConfig struct {
 	// Port is the port remote buckyd daemons listen on
@@ -78,40 +75,10 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 	}
 
 	for _, v := range master.Nodes {
-		// There are two formats for the hashring here -- INSTANCE is optional
-		// 1) SERVER:INSTANCE
-		// 2) SERVER
-		// 3) SERVER:PORT:INSTANCE
-		// 4) SERVER:PORT
-		fields := strings.Split(v, ":")
-		Cluster.Servers = append(Cluster.Servers, fields[0])
-		if len(fields) == 1 {
-			fields = append(fields, "2003")
-			fields = append(fields, "")
-		} else if len(fields) == 2 {
-			_, err := strconv.Atoi(fields[1])
-			if err != nil {
-				// assume instance
-				fields = append(fields, fields[1])
-				fields[1] = "2003"
-			} else {
-				fields = append(fields, "")
-			}
-		} else {
-			// 3 or more fields
-			fields = fields[:3]
-		}
-		if fields[1] == "" {
-			fields[1] = "2003"
-		}
-		port, err := strconv.ParseUint(fields[1], 10, 16)
-		if err != nil {
-			port = 2003
-		}
-		Cluster.Hash.AddNode(hashing.Node{fields[0], uint(port), fields[2]})
+		Cluster.Hash.AddNode(v)
 	}
 
-	members := make([]*JSONRingType, 0)
+	members := make([]*hashing.JSONRingType, 0)
 	for _, srv := range Cluster.Servers {
 		if srv == master.Name {
 			// Don't query the initial daemon again
@@ -133,7 +100,7 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 // a healthy cluster.  The master is the initial buckyd daemon we
 // built the list from.  The ring is a slice of ring objects from each
 // server in the cluster except the initial buckyd daemon.
-func isHealthy(master *JSONRingType, ring []*JSONRingType) bool {
+func isHealthy(master *hashing.JSONRingType, ring []*hashing.JSONRingType) bool {
 	// XXX: Take replicas into account
 	// The initial buckyd daemon isn't in the ring, so we need to add 1
 	// to the length.
@@ -151,8 +118,8 @@ func isHealthy(master *JSONRingType, ring []*JSONRingType) bool {
 		if len(v.Nodes) != len(master.Nodes) {
 			return false
 		}
-		for j, _ := range v.Nodes {
-			if v.Nodes[j] != master.Nodes[j] {
+		for i, v := range v.Nodes {
+			if !hashing.NodeCmp(master.Nodes[i], v) {
 				return false
 			}
 		}

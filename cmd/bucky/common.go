@@ -15,8 +15,8 @@ import (
 
 import "github.com/golang/snappy"
 
-import . "github.com/jjneely/buckytools"
 import . "github.com/jjneely/buckytools/metrics"
+import "github.com/jjneely/buckytools/hashing"
 
 // HostPort is a convenience variable for sub-commands.  This holds the
 // HOST:PORT to connect to if SetupHostname() is called in init()
@@ -336,7 +336,7 @@ func PostMetric(server string, metric *MetricData) error {
 // representing its hashring configuration.  An error value is
 // set if we could not retrieve the hashring information.  The server
 // string must include any port information.
-func GetSingleHashRing(server string) (*JSONRingType, error) {
+func GetSingleHashRing(server string) (*hashing.JSONRingType, error) {
 	u := &url.URL{
 		Scheme: "http",
 		Host:   server,
@@ -361,7 +361,7 @@ func GetSingleHashRing(server string) (*JSONRingType, error) {
 		return nil, fmt.Errorf("/hashring API called returned: %s", resp.Status)
 	}
 
-	ring := new(JSONRingType)
+	ring := new(hashing.JSONRingType)
 	blob, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Error reading response body: %s", err)

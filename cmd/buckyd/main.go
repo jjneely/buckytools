@@ -12,10 +12,11 @@ import (
 
 import . "github.com/jjneely/buckytools"
 import "github.com/jjneely/buckytools/metrics"
+import "github.com/jjneely/buckytools/hashing"
 
 var metricsCache *metrics.MetricsCacheType
 var tmpDir string
-var hashring *JSONRingType
+var hashring *hashing.JSONRingType
 
 // sparseFiles defines if we create and manage sparse files.
 var sparseFiles bool
@@ -31,7 +32,7 @@ func usage() {
 		"\tconsistent hashring as found in your carbon-relay configuration\n.",
 		"\tAll of the daemons in your cluster need to be able to build\n",
 		"\tthe same hashring.  You may specify nodes in the following\n",
-		"\tformats: SERVER, SERVER:INSTANCE, SERVER:PORT:INSTANCE.\n",
+		"\tformat: HOST[:PORT][=INSTANCE]\n\n",
 	}
 
 	fmt.Printf(strings.Join(t, ""), os.Args[0], Version)
@@ -40,33 +41,21 @@ func usage() {
 
 // parseRing builds a representation of the hashring from the command
 // line arguments
-func parseRing(hostname, algo string, replicas int) *JSONRingType {
+func parseRing(hostname, algo string, replicas int) *hashing.JSONRingType {
 	if flag.NArg() < 1 {
-		log.Fatalf("You must have at least 1 node in your hash ring")
+		log.Printf("You must have at least 1 node in your hash ring")
+		usage()
+		os.Exit(1)
 	}
-	ring := new(JSONRingType)
-	ring.Nodes = make([]string, 0)
+	ring := new(hashing.JSONRingType)
 	ring.Name = hostname
 	ring.Algo = algo
 	ring.Replicas = replicas
-	for i := 0; i < flag.NArg(); i++ {
-		var n string
-		switch strings.Count(flag.Arg(i), ":") {
-		case 0:
-			// server name only
-			n = flag.Arg(i)
-		case 1:
-			// server:instance
-			fields := strings.Split(flag.Arg(i), ":")
-			n = fmt.Sprintf("%s:%s", fields[0], fields[1])
-		case 2:
-			// server:port:instance -- port is not considered
-			fields := strings.Split(flag.Arg(i), ":")
-			n = fmt.Sprintf("%s:%s", fields[0], fields[2])
-		default:
-			log.Fatalf("Error parsing hashring members from cli.")
+	for _, v := range flag.Args() {
+		n, err := hashing.NewNodeParser(v)
+		if err != nil {
+			log.Fatalf("Error parsing hashring: %s", err.Error())
 		}
-
 		ring.Nodes = append(ring.Nodes, n)
 	}
 

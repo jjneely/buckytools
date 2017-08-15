@@ -2,11 +2,31 @@ package hashing
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	//"log"
 	//"os"
+	"strconv"
 	"strings"
 )
+
+// Node is a server and instance value used in the hash ring.  A key is
+// mapped to one or more of the configured Node structs in the hash ring.
+type Node struct {
+	Server   string
+	Port     int
+	Instance string
+}
+
+// JSONRingType is a datastructure that identifies the name of the server
+// buckdy is running on and contains a slice of nodes which are
+// "server:instance" (where ":instance" is optional) formatted strings
+type JSONRingType struct {
+	Name     string
+	Nodes    []Node
+	Algo     string
+	Replicas int
+}
 
 // HashRing is an interface that allows us to plug in multiple hash ring
 // implementations.
@@ -38,14 +58,6 @@ type HashRing interface {
 	Nodes() []Node
 }
 
-// Node is a server and instance value used in the hash ring.  A key is
-// mapped to one or more of the configured Node structs in the hash ring.
-type Node struct {
-	Server   string
-	Port     uint
-	Instance string
-}
-
 // RingEntry is used to record the position of Nodes in the ring.  Not used
 // in all implementations.
 type RingEntry struct {
@@ -60,6 +72,15 @@ type CarbonHashRing struct {
 	replicas int
 }
 
+// String marshals a JSONRingType into its string representation
+func (j *JSONRingType) String() string {
+	blob, err := json.Marshal(j)
+	if err != nil {
+		return err.Error()
+	}
+	return string(blob)
+}
+
 // NewCarbonHashRing sets up a new CarbonHashRing and returns it.
 func NewCarbonHashRing() *CarbonHashRing {
 	var chr = new(CarbonHashRing)
@@ -72,11 +93,83 @@ func NewCarbonHashRing() *CarbonHashRing {
 
 // NewNode returns a node object setup with the given server string and
 // instance string.  None or empty instances should be represented by ""
-func NewNode(server string, port uint, instance string) (n Node) {
+func NewNode(server string, port int, instance string) (n Node) {
 	n.Server = server
 	n.Port = port
 	n.Instance = instance
 	return n
+}
+
+// NewNodeParser parses a HOST[:PORT][=INSTANCE] format string and builds a
+// Node object which is returned.  An error is returned if the string could
+// not be parsed.
+func NewNodeParser(s string) (Node, error) {
+	var (
+		state    int
+		hostname []rune
+		port     []rune
+		instance []rune
+
+		parsedPort int64
+		err        error
+	)
+
+	for _, v := range s {
+		switch state {
+		case 0:
+			// server name
+			if v == ':' {
+				state = 1
+			} else if v == '=' {
+				state = 2
+			} else {
+				hostname = append(hostname, v)
+			}
+		case 1:
+			// server:port
+			if v == '=' {
+				state = 2
+			} else if v == ':' {
+				return Node{}, fmt.Errorf("Error parsing port in %s", s)
+			} else {
+				port = append(port, v)
+			}
+		case 2:
+			// server:port:instance
+			if v == ':' || v == '=' {
+				return Node{}, fmt.Errorf("Error parsing instance in %s", s)
+			}
+			instance = append(instance, v)
+		default:
+			panic("FSM parsing failure")
+		}
+	}
+
+	if len(port) > 0 {
+		parsedPort, err = strconv.ParseInt(string(port), 0, 0)
+		if err != nil {
+			return Node{}, err
+		}
+		if parsedPort < 0 {
+			return Node{}, fmt.Errorf("Negative port number is illegal")
+		}
+	}
+
+	return Node{string(hostname), int(parsedPort), string(instance)}, nil
+}
+
+func NodeCmp(a, b Node) bool {
+	if a.Server != b.Server {
+		return false
+	}
+	if a.Port != b.Port {
+		return false
+	}
+	if a.Instance != b.Instance {
+		return false
+	}
+
+	return true
 }
 
 // computeCarbonRingPosition takes a string and computes where that
