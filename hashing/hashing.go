@@ -276,9 +276,9 @@ func (t Node) CarbonKeyValue() string {
 // Node.String returns a string representation of the Node struct
 func (t Node) String() string {
 	if t.Instance == "" {
-		return fmt.Sprintf("%s:None", t.Server)
+		return fmt.Sprintf("%s:%d=None", t.Server, t.Port)
 	}
-	return fmt.Sprintf("%s:%s", t.Server, t.Instance)
+	return fmt.Sprintf("%s:%d=%s", t.Server, t.Port, t.Instance)
 }
 
 func (t *CarbonHashRing) String() string {

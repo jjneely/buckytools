@@ -16,6 +16,17 @@ func XorShift(i uint64) uint64 {
 	return i * 2685821657736338717
 }
 
+// Fnv1a32 returns a 32 bit hash of the given data using the FNV-1a hashing
+// algorithm.  Golang's libraries natively support this hashing, but I need
+// something simpler.
+func Fnv1a32(data []byte) uint32 {
+	var hash uint32 = 2166136261
+	for _, d := range data {
+		hash = (hash ^ uint32(d)) * 16777619
+	}
+	return hash
+}
+
 // Fnv1a64 returns a 64 bit hash of the given data using the FNV-1a hashing
 // algorithm.  Golang's libraries natively support this hashing, but I need
 // something simpler.

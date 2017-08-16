@@ -46,6 +46,13 @@ func makeFNV1aTestCHRWithInstanceName() *FNV1aHashRing {
 	return chr
 }
 
+func dumpFNV1aRing(t *testing.T, chr *FNV1aHashRing) {
+	for _, v := range chr.ring {
+		t.Logf("%d@%s", v.position, v.node)
+	}
+	t.Logf("Ring length: %d", len(chr.ring))
+}
+
 /*
 cluster test fnv1a_ch replication 1
   graphite010-g5:2003
@@ -66,6 +73,7 @@ func TestFNV1aCHR(t *testing.T) {
 	chr := makeFNV1aTestCHR()
 	t.Logf(chr.String())
 
+	dumpFNV1aRing(t, chr)
 	data := map[string]string{
 		"foobar": "graphite010-g5",
 		"suebob.foo.honey.i.shrunk.the.kids":                                      "graphite-data021-g5",
@@ -95,6 +103,7 @@ cluster test fnv1a_ch replication 1
 func TestFNV1aCHRInstance(t *testing.T) {
 	chr := makeFNV1aTestCHRWithInstanceName()
 
+	dumpFNV1aRing(t, chr)
 	data := map[string]string{
 		"foobar": "graphite013-g5",
 		"suebob.foo.honey.i.shrunk.the.kids":                                      "graphite-data021-g5",

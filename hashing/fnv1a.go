@@ -1,11 +1,7 @@
 package hashing
 
 import (
-	"encoding/binary"
 	"fmt"
-	"hash/fnv"
-	//"log"
-	//"os"
 	"strings"
 )
 
@@ -28,8 +24,7 @@ func NewFNV1aHashRing() *FNV1aHashRing {
 
 func computeFNV1aRingPosition(key string) (result int) {
 	// compute 32-bits FNV1a hash
-	hash := fnv.New32a()
-	digest := binary.BigEndian.Uint32(hash.Sum([]byte(key)))
+	digest := Fnv1a32([]byte(key))
 
 	// and trim it to the 16bit space
 	result = int((digest >> 16) ^ (digest & uint32(0xFFFF)))
@@ -62,11 +57,10 @@ func (t *FNV1aHashRing) SetReplicas(r int) {
 }
 
 func (t *FNV1aHashRing) AddNode(node Node) {
-	//log.Printf("insertRing(): %s", node.FNV1aKeyValue())
 	t.nodes = append(t.nodes, node)
 	for i := 0; i < t.replicas; i++ {
 		var e RingEntry
-		replica_key := fmt.Sprintf("%s-%d", node.FNV1aKeyValue(), i)
+		replica_key := fmt.Sprintf("%d-%s", i, node.FNV1aKeyValue())
 		e.position = computeFNV1aRingPosition(replica_key)
 		e.node = node
 		t.ring = insertRing(t.ring, e)
@@ -102,14 +96,6 @@ func (t *FNV1aHashRing) GetNode(key string) Node {
 
 	e := RingEntry{computeFNV1aRingPosition(key), NewNode(key, 0, "")}
 	i := mod(bisectLeft(t.ring, e), len(t.ring))
-	//log.Printf("len(ring) = %d", len(t.ring))
-	//log.Printf("Bisect index for %s is %d", key, i)
-	//log.Printf("Ring position for %s is %x", key, e.position)
-	//fd, _ := os.Create("ring.golang")
-	//for r := range t.ring {
-	//	fd.Write([]byte(fmt.Sprintf("%s:%x\n", t.ring[r].node.FNV1aKeyValue(), t.ring[r].position)))
-	//}
-	//fd.Close()
 	return t.ring[i].node
 }
 
