@@ -88,6 +88,21 @@ func makeJumpTestCHRWithInstanceName(r int) *JumpHashRing {
 	return chr
 }
 
+func TestFNV1a32(t *testing.T) {
+	data := map[string]uint32{
+		"252113b5-a6c4-4661-8007-a583d6aa7130": 0xbe564b20,
+		"0aac2773-f766-478e-867f-ba4cca94e524": 0x15a526a8,
+		"6fdcba3a-dc5b-419b-a2bc-b4670b8e85fd": 0xbf5bd512,
+	}
+
+	for s, hash := range data {
+		if Fnv1a32([]byte(s)) != hash {
+			t.Errorf("FNV1a32 implementation does not match reference %s => %x, expected %x",
+				s, Fnv1a32([]byte(s)), hash)
+		}
+	}
+}
+
 func TestFNV1a64(t *testing.T) {
 	data := map[string]uint64{
 		"foobar":  0x85944171f73967e8,
@@ -97,8 +112,8 @@ func TestFNV1a64(t *testing.T) {
 
 	for s, hash := range data {
 		if Fnv1a64([]byte(s)) != hash {
-			t.Errorf("FNV1a64 implementation does not match reference %s => %x",
-				s, Fnv1a64([]byte(s)))
+			t.Errorf("FNV1a64 implementation does not match reference %s => %x, expected %x",
+				s, Fnv1a64([]byte(s)), hash)
 		}
 	}
 }
