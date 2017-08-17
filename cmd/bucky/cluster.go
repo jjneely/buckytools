@@ -76,6 +76,7 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 
 	for _, v := range master.Nodes {
 		Cluster.Hash.AddNode(v)
+		Cluster.Servers = append(Cluster.Servers, v.Server)
 	}
 
 	members := make([]*hashing.JSONRingType, 0)
