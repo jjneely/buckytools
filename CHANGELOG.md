@@ -30,12 +30,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-* Use Snappy framing format for Whisper data over the wire.  This makes
-  transfer of time series databases significantly faster.
+* Unit tests for bucky-pickle-relay
 
 ### Changed
 
 * Inverted delete option in bucky rebalance.  Delete is now off by default.
+* Conform to Go best practices for repo layout
+* Update vendored packages
 
+### Fixed
+
+* Fix tar/restore after Snappy changes
+
+## [0.3.0] 2017-04-27
+
+### Added
+
+* Use Snappy framing format for Whisper data over the wire.  This makes
+  transfer of time series databases significantly faster.
 
 [1]: https://github.com/grobian/carbon-c-relay

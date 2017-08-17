@@ -1,3 +1,11 @@
+buckytools (0.4.0) unstable; urgency=medium
+
+  * Support FNV1a hashing algorithm compatible with carbon-c-relay
+  * All server, port, and instance triples are now formatted as
+    HOST[:PORT][=INSTANCE]
+
+ -- Jack Neely <jjneely@42lines.net>  Thu, 17 Aug 2017 14:41:28 -0400
+
 buckytools (0.3.2) unstable; urgency=medium
 
   * Support ogorek.Tuple types in parsing of pickle objects.  This
