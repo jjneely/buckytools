@@ -125,7 +125,7 @@ func makeRing(config []string) *hashing.CarbonHashRing {
 		if err != nil {
 			port = 2003
 		}
-		hr.AddNode(hashing.NewNode(fields[0], uint(port), fields[2]))
+		hr.AddNode(hashing.NewNode(fields[0], int(port), fields[2]))
 	}
 
 	return hr
