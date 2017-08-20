@@ -107,7 +107,7 @@ pass to the daemon as arguments the members of the consistent hash ring.
 
 Here `-node` is the name of this Graphite node in the hashring (if different
 from what is derived from the host name).  `-b` or `-bind` is the address to
-bind to.  You can also specify `-prefix`` where your Whisper data store is and
+bind to.  You can also specify `-prefix` where your Whisper data store is and
 `-tmpdir` where the daemon can write temporary files.  The `-sparse` option
 instructs buckyd to create sparse whisper files that take less disk space.
 The `-hash` option chooses the hashring algorithm.
