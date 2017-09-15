@@ -31,9 +31,8 @@ BUCKYHOST environment variable.  Cluster health is not checked.  Moves that
 result in metrics that live on a different host will be completed, so other
 hosts will be affected even with -s.
 
-Use --no-delete to leave the old metrics in place.  The default is to
-remove metrics from their old location after they have been moved and
-backfilled to the new location.
+Use --delete to delete metric source locations.  The default is to not remove
+the source metrics.
 
 The --no-op option will not alter any metrics and print a report of what
 would have been done.
