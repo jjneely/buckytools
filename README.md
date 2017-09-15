@@ -62,7 +62,7 @@ These are the tools included and their functionality.
   * **rebalance** -- Move inconsistent metrics to the correct location
     and delete the source immediately after successful backfill.
   * **restore** -- Restore from a tar archive.
-  * **severs** -- List each server's known hash ring and verify that
+  * **servers** -- List each server's known hash ring and verify that
     all hash rings are consistent.
   * **tar** -- Make an archive of a list or regular expression of metric
     names and dump it in tar format to STDOUT.
