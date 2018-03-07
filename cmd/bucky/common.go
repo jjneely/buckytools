@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 import "github.com/golang/snappy"
@@ -39,10 +40,16 @@ func GetHTTP() *http.Client {
 		return httpClient
 	}
 
-	httpClient = new(http.Client)
-
-	// Set a 30 second timeout on all operations
-	//httpClient.Timeout = 30 * time.Second
+	httpClient := &http.Client{
+		Timeout: 600 * time.Second,
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout:   1 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			ResponseHeaderTimeout: 1 * time.Second,
+		},
+	}
 
 	return httpClient
 }
