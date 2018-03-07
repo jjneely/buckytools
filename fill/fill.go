@@ -54,7 +54,7 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 			}
 			tsStart += ts.Step()
 		}
-		dstWsp.UpdateMany(points)
+		dstWsp.UpdateManyWithRetention(points, v.MaxRetention())
 
 		stop = fromTime
 		if start >= stop {

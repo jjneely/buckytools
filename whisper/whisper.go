@@ -369,7 +369,9 @@ func (whisper *Whisper) Update(value float64, timestamp int) (err error) {
 	return nil
 }
 
-func (whisper *Whisper) UpdateMany(points []*TimeSeriesPoint) {
+// UpdateManyWithRetention updates only archive with specified retention.
+// retention = -1 means "update all possible archives"
+func (whisper *Whisper) UpdateManyWithRetention(points []*TimeSeriesPoint, retention int) {
 	// sort the points, newest first
 	sort.Sort(timeSeriesPointsNewestFirst{points})
 
@@ -377,6 +379,9 @@ func (whisper *Whisper) UpdateMany(points []*TimeSeriesPoint) {
 
 	var currentPoints []*TimeSeriesPoint
 	for _, archive := range whisper.archives {
+		if retention != -1 && retention != archive.MaxRetention() {
+			continue
+		}
 		currentPoints, points = extractPoints(points, now, archive.MaxRetention())
 		if len(currentPoints) == 0 {
 			continue
@@ -391,6 +396,10 @@ func (whisper *Whisper) UpdateMany(points []*TimeSeriesPoint) {
 			break
 		}
 	}
+}
+
+func (whisper *Whisper) UpdateMany(points []*TimeSeriesPoint) {
+	whisper.UpdateManyWithRetention(points, -1)
 }
 
 func (whisper *Whisper) archiveUpdateMany(archive *archiveInfo, points []*TimeSeriesPoint) {
