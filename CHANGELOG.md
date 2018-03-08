@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ## [0.4.0] - 2017-08-17
+### Fixed
+* Fixed bug with backfilling metrics. See https://github.com/jjneely/buckytools/issues/19 for more information
+
 ### Added
 
 * Support for FNV1a hashing compatible with [carbon-c-relay][1] hash method
   `fnv1a_ch`.  Issue #17
+* Makefile to build everything with single 'make'
+* Timeouts for bucky
+* Buckyd now removes empty directories
 
 ### Changed
 
