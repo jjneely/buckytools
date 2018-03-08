@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-import "github.com/jjneely/buckytools/hashing"
+import "github.com/go-graphite/buckytools/hashing"
 import "github.com/pborman/uuid"
 
 func getConfig(file string) []string {

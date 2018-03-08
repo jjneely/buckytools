@@ -10,9 +10,9 @@ import (
 	"strings"
 )
 
-import . "github.com/jjneely/buckytools"
-import "github.com/jjneely/buckytools/metrics"
-import "github.com/jjneely/buckytools/hashing"
+import . "github.com/go-graphite/buckytools"
+import "github.com/go-graphite/buckytools/metrics"
+import "github.com/go-graphite/buckytools/hashing"
 
 var metricsCache *metrics.MetricsCacheType
 var tmpDir string

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// import "github.com/jjneely/buckytools/hashing"
+// import "github.com/go-graphite/buckytools/hashing"
 
 func init() {
 	usage := "[options]"

@@ -12,8 +12,8 @@ import (
 )
 
 import (
-	"github.com/jjneely/buckytools"
-	"github.com/jjneely/buckytools/lock"
+	"github.com/go-graphite/buckytools"
+	"github.com/go-graphite/buckytools/lock"
 )
 
 // Command Line Flags

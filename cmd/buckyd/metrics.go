@@ -15,8 +15,8 @@ import (
 
 import "github.com/golang/snappy"
 
-import . "github.com/jjneely/buckytools/metrics"
-import "github.com/jjneely/buckytools/fill"
+import . "github.com/go-graphite/buckytools/metrics"
+import "github.com/go-graphite/buckytools/fill"
 
 // listMetrics retrieves a list of metrics on the localhost and sends
 // it to the client.

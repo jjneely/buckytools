@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-import "github.com/jjneely/buckytools/hashing"
+import "github.com/go-graphite/buckytools/hashing"
 
 type ClusterConfig struct {
 	// Port is the port remote buckyd daemons listen on

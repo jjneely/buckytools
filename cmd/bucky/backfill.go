@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// import "github.com/jjneely/buckytools/hashing"
+// import "github.com/go-graphite/buckytools/hashing"
 
 type MigrateWork struct {
 	oldName     string
