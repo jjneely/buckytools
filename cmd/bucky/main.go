@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-import . "github.com/jjneely/buckytools"
+import . "github.com/go-graphite/buckytools"
 
 // We use STDIN and STDOUT as much as possible for handing lists, and
 // other data.  Status, errors, and other data not related to pushing

@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-import "github.com/jjneely/buckytools"
-import "github.com/jjneely/buckytools/fill"
+import "github.com/go-graphite/buckytools"
+import "github.com/go-graphite/buckytools/fill"
 
 var (
 	deleteSourceFiles bool

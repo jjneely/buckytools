@@ -16,8 +16,8 @@ import (
 
 import "github.com/golang/snappy"
 
-import . "github.com/jjneely/buckytools/metrics"
-import "github.com/jjneely/buckytools/hashing"
+import . "github.com/go-graphite/buckytools/metrics"
+import "github.com/go-graphite/buckytools/hashing"
 
 // HostPort is a convenience variable for sub-commands.  This holds the
 // HOST:PORT to connect to if SetupHostname() is called in init()

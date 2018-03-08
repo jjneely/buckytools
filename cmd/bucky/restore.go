@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-import . "github.com/jjneely/buckytools/metrics"
+import . "github.com/go-graphite/buckytools/metrics"
 
 var tarPrefix string
 

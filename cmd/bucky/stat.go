@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-import . "github.com/jjneely/buckytools/metrics"
+import . "github.com/go-graphite/buckytools/metrics"
 
 func init() {
 	usage := "[options] <metric expression>"

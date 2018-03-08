@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-import "github.com/jjneely/buckytools/whisper"
+import "github.com/go-graphite/buckytools/whisper"
 
 // FindValidDataPoints does a backwards walk through time to examine the
 // highest resolution data for each archive / time period.  We collect valid
