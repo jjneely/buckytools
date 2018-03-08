@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-import "github.com/golang/crypto/ssh/terminal"
+import "golang.org/x/crypto/ssh/terminal"
 import "github.com/go-graphite/buckytools/metrics"
 
 var metricWorkers int
