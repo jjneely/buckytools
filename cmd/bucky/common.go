@@ -47,7 +47,7 @@ func GetHTTP() *http.Client {
 				Timeout:   1 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).Dial,
-			ResponseHeaderTimeout: 1 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second,
 		},
 	}
 
