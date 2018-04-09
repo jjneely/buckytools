@@ -44,10 +44,9 @@ func GetHTTP() *http.Client {
 		Timeout: 600 * time.Second,
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
-				Timeout:   1 * time.Second,
-				KeepAlive: 30 * time.Second,
+				Timeout: 1 * time.Second,
 			}).Dial,
-			ResponseHeaderTimeout: 5 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
 		},
 	}
 
