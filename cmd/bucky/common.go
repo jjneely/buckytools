@@ -40,7 +40,7 @@ func GetHTTP() *http.Client {
 		return httpClient
 	}
 
-	httpClient := &http.Client{
+	httpClient = &http.Client{
 		Timeout: 600 * time.Second,
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
