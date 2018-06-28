@@ -81,10 +81,29 @@ func resizeCommand(c Command) int {
 		}
 
 		tarchive := newArchives[resizeArchiveIndex]
-		dps := result.ReadSeries(tarchive.Offset(), int64(tarchive.End()), &tarchive)
-		sort.Sort(whisper.DataPoints(dps))
-		for i, dp := range dps {
-			if _, err := newFile.WriteAt(dp.Bytes(), tarchive.Offset()+whisper.PointSize*int64(i)); err != nil {
+		// dps := result.ReadSeries(tarchive.Offset(), int64(tarchive.End()), &tarchive)
+		// sort.Sort(whisper.DataPoints(dps))
+
+		oldTarchive := target.ArchiveInfos()[resizeArchiveIndex]
+		dps := target.ReadSeries(oldTarchive.Offset(), int64(oldTarchive.End()), &oldTarchive)
+
+		startPoint := dps[0]
+		for _, dp := range dps {
+			if dp.Interval() > 0 && dp.Interval() < startPoint.Interval() {
+				startPoint = dp
+			}
+		}
+
+		newFile.WriteAt(startPoint.Bytes(), tarchive.Offset())
+
+		for _, dp := range dps {
+			if dp.Interval() == startPoint.Interval() {
+				continue
+			}
+			// if _, err := newFile.WriteAt(dp.Bytes(), tarchive.Offset()+whisper.PointSize*int64(i)); err != nil {
+			// 	panic(err)
+			// }
+			if _, err := newFile.WriteAt(dp.Bytes(), tarchive.PointOffset(startPoint.Interval(), dp.Interval())); err != nil {
 				panic(err)
 			}
 		}
