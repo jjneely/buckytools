@@ -67,7 +67,8 @@ func resizeCommand(c Command) int {
 
 	if resizeArchiveIndex != -1 {
 		newArchives := result.ArchiveInfos()
-		for i, oldArchive := range target.ArchiveInfos() {
+		oldArchives := target.ArchiveInfos()
+		for i, oldArchive := range oldArchives {
 			if _, err := oldFile.Seek(oldArchive.Offset(), 0); err != nil {
 				panic(err)
 			}
@@ -80,12 +81,8 @@ func resizeCommand(c Command) int {
 			}
 		}
 
-		tarchive := newArchives[resizeArchiveIndex]
-		// dps := result.ReadSeries(tarchive.Offset(), int64(tarchive.End()), &tarchive)
-		// sort.Sort(whisper.DataPoints(dps))
-
-		oldTarchive := target.ArchiveInfos()[resizeArchiveIndex]
-		dps := target.ReadSeries(oldTarchive.Offset(), int64(oldTarchive.End()), &oldTarchive)
+		oldArchive := oldArchives[resizeArchiveIndex]
+		dps := target.ReadSeries(oldArchive.Offset(), int64(oldArchive.End()), &oldArchive)
 
 		startPoint := dps[0]
 		for _, dp := range dps {
@@ -94,16 +91,77 @@ func resizeCommand(c Command) int {
 			}
 		}
 
-		newFile.WriteAt(startPoint.Bytes(), tarchive.Offset())
+		startInterval := 0
+		newArchive := newArchives[resizeArchiveIndex]
+
+		// best-effort backfilling of extended dps
+		{
+			lowerArchive := newArchive
+			for _, arc := range newArchives {
+				if arc.SecondsPerPoint() > newArchive.SecondsPerPoint() && (lowerArchive.SecondsPerPoint() == newArchive.SecondsPerPoint() || lowerArchive.SecondsPerPoint() > arc.SecondsPerPoint()) {
+					lowerArchive = arc
+				}
+			}
+			extendedStart := startPoint.Interval() - (newArchive.NumberOfPoints()-oldArchive.NumberOfPoints())*newArchive.SecondsPerPoint()
+			extendedEnd := startPoint.Interval()
+
+			// println("extendedStart", extendedStart)
+			// println("extendedEnd", extendedEnd)
+
+			fromInterval := lowerArchive.Interval(extendedStart)
+			untilInterval := lowerArchive.Interval(extendedEnd)
+			baseInterval := result.GetBaseInterval(&lowerArchive)
+			fromOffset := lowerArchive.PointOffset(baseInterval, fromInterval) - whisper.PointSize
+			untilOffset := lowerArchive.PointOffset(baseInterval, untilInterval) + whisper.PointSize
+
+			lowerDps := result.ReadSeries(fromOffset, untilOffset, &lowerArchive)
+			// pretty.Println(lowerDps)
+			lowerIntervalMap := map[int]float64{}
+			for _, dp := range lowerDps {
+				lowerIntervalMap[dp.Interval()] = dp.Value()
+			}
+			// startInterval = 0
+			for ts := extendedStart; ts < extendedEnd; ts += newArchive.SecondsPerPoint() {
+				val, ok := lowerIntervalMap[lowerArchive.Interval(ts)-lowerArchive.SecondsPerPoint()]
+				// println(ts, lowerArchive.Interval(ts))
+				if !ok {
+					continue
+				}
+
+				switch result.AggregationMethod() {
+				case whisper.Sum:
+					val /= float64(lowerArchive.SecondsPerPoint() / newArchive.SecondsPerPoint())
+				}
+
+				dp := whisper.NewDataPoint(ts, val)
+				// println(dp.Interval(), val)
+				if startInterval == 0 {
+					startInterval = ts
+					newFile.WriteAt(dp.Bytes(), newArchive.Offset())
+				} else {
+					newFile.WriteAt(dp.Bytes(), newArchive.PointOffset(startInterval, dp.Interval()))
+				}
+			}
+		}
+
+		if startInterval == 0 {
+			startInterval = startPoint.Interval()
+			newFile.WriteAt(startPoint.Bytes(), newArchive.Offset())
+		} else {
+			newFile.WriteAt(startPoint.Bytes(), newArchive.PointOffset(startInterval, startPoint.Interval()))
+		}
+
+		// pretty.Println(lowerArchive)
 
 		for _, dp := range dps {
-			if dp.Interval() == startPoint.Interval() {
+			if dp.Interval() == 0 || dp.Interval() == startInterval {
 				continue
 			}
-			// if _, err := newFile.WriteAt(dp.Bytes(), tarchive.Offset()+whisper.PointSize*int64(i)); err != nil {
+			// if _, err := newFile.WriteAt(dp.Bytes(), newArchive.Offset()+whisper.PointSize*int64(i)); err != nil {
 			// 	panic(err)
 			// }
-			if _, err := newFile.WriteAt(dp.Bytes(), tarchive.PointOffset(startPoint.Interval(), dp.Interval())); err != nil {
+			// println(dp.Interval(), dp.Value())
+			if _, err := newFile.WriteAt(dp.Bytes(), newArchive.PointOffset(startInterval, dp.Interval())); err != nil {
 				panic(err)
 			}
 		}

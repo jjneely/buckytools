@@ -406,7 +406,7 @@ func (whisper *Whisper) archiveUpdateMany(archive *archiveInfo, points []*TimeSe
 	alignedPoints := alignPoints(archive, points)
 	intervals, packedBlocks := PackSequences(archive, alignedPoints)
 
-	baseInterval := whisper.getBaseInterval(archive)
+	baseInterval := whisper.GetBaseInterval(archive)
 	if baseInterval == 0 {
 		baseInterval = intervals[0]
 	}
@@ -495,14 +495,14 @@ func PackSequences(archive *archiveInfo, points []dataPoint) (intervals []int, p
 	This method retrieves the baseInterval and the
 */
 func (whisper *Whisper) getPointOffset(start int, archive *archiveInfo) int64 {
-	baseInterval := whisper.getBaseInterval(archive)
+	baseInterval := whisper.GetBaseInterval(archive)
 	if baseInterval == 0 {
 		return archive.Offset()
 	}
 	return archive.PointOffset(baseInterval, start)
 }
 
-func (whisper *Whisper) getBaseInterval(archive *archiveInfo) int {
+func (whisper *Whisper) GetBaseInterval(archive *archiveInfo) int {
 	baseInterval, err := whisper.readInt(archive.Offset())
 	if err != nil {
 		panic("Failed to read baseInterval")
@@ -618,7 +618,7 @@ func (whisper *Whisper) Fetch(fromTime, untilTime int) (timeSeries *TimeSeries, 
 
 	fromInterval := archive.Interval(fromTime)
 	untilInterval := archive.Interval(untilTime)
-	baseInterval := whisper.getBaseInterval(&archive)
+	baseInterval := whisper.GetBaseInterval(&archive)
 
 	if baseInterval == 0 {
 		step := archive.secondsPerPoint
