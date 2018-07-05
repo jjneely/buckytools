@@ -1,7 +1,10 @@
 package main
 
 import (
+	"io"
+	"os"
 	"sort"
+	"syscall"
 
 	"github.com/go-graphite/buckytools/whisper"
 )
@@ -31,7 +34,34 @@ func init() {
 
 // resizeCommand runs this subcommand.
 func resizeCommand(c Command) int {
-	target, err := whisper.Open(resizeFilename)
+	resizeFile, err := os.Open(resizeFilename)
+	if err != nil {
+		panic(err)
+	}
+	if err = syscall.Flock(int(resizeFile.Fd()), syscall.LOCK_EX); err != nil {
+		resizeFile.Close()
+		panic(err)
+	}
+	defer resizeFile.Close()
+
+	backupFile, err := os.Create(resizeFilename + ".bak")
+	if err != nil {
+		panic(err)
+	}
+	if _, err := io.Copy(backupFile, resizeFile); err != nil {
+		panic(err)
+	}
+	if err := backupFile.Close(); err != nil {
+		panic(err)
+	}
+	if err := resizeFile.Truncate(0); err != nil {
+		panic(err)
+	}
+	if _, err := resizeFile.Seek(0, 0); err != nil {
+		panic(err)
+	}
+
+	target, err := whisper.Open(resizeFilename + ".bak")
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +87,7 @@ func resizeCommand(c Command) int {
 		}
 	}
 
-	result, err := whisper.Create(resizeFilename+".new", newRetentions, aggMethod, target.XFF())
+	result, err := whisper.Create2(resizeFile, newRetentions, aggMethod, target.XFF())
 	if err != nil {
 		panic(err)
 	}

@@ -142,6 +142,7 @@ func Create(path string, retentions Retentions, aggregationMethod AggregationMet
 	if err = validateRetentions(retentions); err != nil {
 		return nil, err
 	}
+
 	_, err = os.Stat(path)
 	if err == nil {
 		return nil, os.ErrExist
@@ -154,6 +155,15 @@ func Create(path string, retentions Retentions, aggregationMethod AggregationMet
 	// Lock file as carbon-cache.py would
 	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		file.Close()
+		return nil, err
+	}
+
+	return Create2(file, retentions, aggregationMethod, xFilesFactor)
+}
+
+func Create2(file *os.File, retentions Retentions, aggregationMethod AggregationMethod, xFilesFactor float32) (whisper *Whisper, err error) {
+	sort.Sort(RetentionsByPrecision{retentions})
+	if err = validateRetentions(retentions); err != nil {
 		return nil, err
 	}
 	whisper = new(Whisper)
