@@ -21,7 +21,7 @@ func init() {
 	short := ""
 	long := ``
 
-	c := NewCommand(resizeCommand, "resize", usage, short, long)
+	c := NewCommand(modifyCommand, "modify", usage, short, long)
 	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
@@ -32,8 +32,8 @@ func init() {
 	c.Flag.StringVar(&resizeAgg, "agg", "", "new aggregation method")
 }
 
-// resizeCommand runs this subcommand.
-func resizeCommand(c Command) int {
+// modifyCommand runs this subcommand.
+func modifyCommand(c Command) int {
 	resizeFile, err := os.Open(resizeFilename)
 	if err != nil {
 		panic(err)
