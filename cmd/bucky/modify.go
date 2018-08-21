@@ -19,18 +19,40 @@ var (
 )
 
 func init() {
-	usage := ""
-	short := ""
-	long := ``
+	usage := "[options]"
+	short := "Resize archive or change aggregation policy."
+	long := `Modify command supports two operations: resize, or update aggregation policy.
+
+Resize mode allows user to resize one archive at a time. It only change the
+targeting archive and does not affect other archives. Use -index to specify
+resized archives.
+
+Use -retention to specify new policy (with the same format in whisper
+configuration). To resize to bigger time range, modify command upsample data
+from lower-resolution archives.
+
+Example:
+	bucky modify -index 1 -retention 1m:30d -f 100_olddata.wsp
+
+Change aggregation policy. Other than changing policy, this command would also
+try to correct data if it's changing policy from average -> sum, or sum -> average.
+For other types of changes, it would only do a simple data copy.
+
+Example:
+	bucky modify -f small.wsp.new -agg average
+
+By default, both tool would copy the original whisper file as a new back in the
+same location.
+`
 
 	c := NewCommand(modifyCommand, "modify", usage, short, long)
 	SetupCommon(c)
 	SetupHostname(c)
 	SetupSingle(c)
 
-	c.Flag.StringVar(&resizeFilename, "f", "", "whisper file to resize")
+	c.Flag.StringVar(&resizeFilename, "f", "", "whisper file to modify")
 	c.Flag.IntVar(&resizeArchiveIndex, "index", -1, "archive index")
-	c.Flag.StringVar(&resizeNewRetention, "retention", "", "new retention")
+	c.Flag.StringVar(&resizeNewRetention, "retention", "", "new retention policy (with the same format in whisper configuration; e.g. 1m:30d)")
 	c.Flag.StringVar(&resizeAgg, "agg", "", "new aggregation method")
 	c.Flag.BoolVar(&resizeUseNow, "now", false, "use now to find archive offset")
 }
@@ -181,9 +203,6 @@ func resizeArchive(target, result *whisper.Whisper) {
 		extendedStart := offsetInterval - (newArchive.NumberOfPoints()-oldArchive.NumberOfPoints())*newArchive.SecondsPerPoint()
 		extendedEnd := offsetInterval
 
-		// println("extendedStart", extendedStart)
-		// println("extendedEnd", extendedEnd)
-
 		fromInterval := lowerArchive.Interval(extendedStart)
 		untilInterval := lowerArchive.Interval(extendedEnd)
 		baseInterval := result.GetBaseInterval(&lowerArchive)
@@ -191,15 +210,12 @@ func resizeArchive(target, result *whisper.Whisper) {
 		untilOffset := lowerArchive.PointOffset(baseInterval, untilInterval) + whisper.PointSize
 
 		lowerDps := result.ReadSeries(fromOffset, untilOffset, &lowerArchive)
-		// pretty.Println(lowerDps)
 		lowerIntervalMap := map[int]float64{}
 		for _, dp := range lowerDps {
 			lowerIntervalMap[dp.Interval()] = dp.Value()
 		}
-		// startInterval = 0
 		for ts := extendedStart; ts < extendedEnd; ts += newArchive.SecondsPerPoint() {
 			val, ok := lowerIntervalMap[lowerArchive.Interval(ts)-lowerArchive.SecondsPerPoint()]
-			// println(ts, lowerArchive.Interval(ts))
 			if !ok {
 				continue
 			}
@@ -227,16 +243,11 @@ func resizeArchive(target, result *whisper.Whisper) {
 		newFile.WriteAt(oldStartPoint.Bytes(), newArchive.PointOffset(startInterval, oldStartPoint.Interval()))
 	}
 
-	// pretty.Println(lowerArchive)
-
 	for _, dp := range dps {
 		if dp.Interval() == 0 || dp.Interval() == startInterval {
 			continue
 		}
-		// if _, err := newFile.WriteAt(dp.Bytes(), newArchive.Offset()+whisper.PointSize*int64(i)); err != nil {
-		// 	panic(err)
-		// }
-		// println(dp.Interval(), dp.Value())
+
 		if _, err := newFile.WriteAt(dp.Bytes(), newArchive.PointOffset(startInterval, dp.Interval())); err != nil {
 			panic(err)
 		}
