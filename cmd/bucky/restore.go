@@ -151,7 +151,7 @@ func restoreCommand(c Command) int {
 	if c.Flag.Arg(0) != "-" {
 		fd, err := os.Open(c.Flag.Arg(0))
 		if err != nil {
-			log.Fatal("Error opening tar archive: %s", err)
+			log.Fatalf("Error opening tar archive: %s", err)
 		}
 		err = RestoreTar(Cluster.HostPorts(), fd)
 	} else {

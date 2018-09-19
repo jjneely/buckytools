@@ -90,7 +90,7 @@ func writeTar(workOut chan *metrics.MetricData, wg *sync.WaitGroup) {
 
 	err := tw.Close()
 	if err != nil {
-		log.Fatal("Error closing tar archive: %s", err)
+		log.Fatalf("Error closing tar archive: %s", err)
 	}
 
 	wg.Done()

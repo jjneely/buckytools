@@ -189,7 +189,7 @@ func backfillCommand(c Command) int {
 	if c.Flag.Arg(0) != "-" {
 		fd, err = os.Open(c.Flag.Arg(0))
 		if err != nil {
-			log.Fatal("Error opening json map: %s", err)
+			log.Fatalf("Error opening json map: %s", err)
 		}
 		defer fd.Close()
 	} else {
