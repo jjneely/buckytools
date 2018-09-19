@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+    host1:
+        environment:
+            - GRAPHITE_HOST="host1"
+        build: .
+        ports:
+            - "81:80"
+            - "2103:2003"
+        volumes:
+            - ./storage1:/var/lib/graphite/whisper
+
+    host2:
+        environment:
+            - GRAPHITE_HOST="host2"
+        build: .
+        ports:
+            - "82:80"
+            - "2203:2003"
+        volumes:
+            - ./storage2:/var/lib/graphite/whisper
+
+    host3:
+        environment:
+            - GRAPHITE_HOST="host3"
+        build: .
+        ports:
+            - "83:80"
+            - "2303:2003"
+        volumes:
+            - ./storage3:/var/lib/graphite/whisper
+
