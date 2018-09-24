@@ -142,6 +142,7 @@ func Create(path string, retentions Retentions, aggregationMethod AggregationMet
 	if err = validateRetentions(retentions); err != nil {
 		return nil, err
 	}
+
 	_, err = os.Stat(path)
 	if err == nil {
 		return nil, os.ErrExist
@@ -154,6 +155,15 @@ func Create(path string, retentions Retentions, aggregationMethod AggregationMet
 	// Lock file as carbon-cache.py would
 	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		file.Close()
+		return nil, err
+	}
+
+	return Create2(file, retentions, aggregationMethod, xFilesFactor)
+}
+
+func Create2(file *os.File, retentions Retentions, aggregationMethod AggregationMethod, xFilesFactor float32) (whisper *Whisper, err error) {
+	sort.Sort(RetentionsByPrecision{retentions})
+	if err = validateRetentions(retentions); err != nil {
 		return nil, err
 	}
 	whisper = new(Whisper)
@@ -404,9 +414,9 @@ func (whisper *Whisper) UpdateMany(points []*TimeSeriesPoint) {
 
 func (whisper *Whisper) archiveUpdateMany(archive *archiveInfo, points []*TimeSeriesPoint) {
 	alignedPoints := alignPoints(archive, points)
-	intervals, packedBlocks := packSequences(archive, alignedPoints)
+	intervals, packedBlocks := PackSequences(archive, alignedPoints)
 
-	baseInterval := whisper.getBaseInterval(archive)
+	baseInterval := whisper.GetBaseInterval(archive)
 	if baseInterval == 0 {
 		baseInterval = intervals[0]
 	}
@@ -475,7 +485,7 @@ func alignPoints(archive *archiveInfo, points []*TimeSeriesPoint) []dataPoint {
 	return alignedPoints
 }
 
-func packSequences(archive *archiveInfo, points []dataPoint) (intervals []int, packedBlocks [][]byte) {
+func PackSequences(archive *archiveInfo, points []dataPoint) (intervals []int, packedBlocks [][]byte) {
 	intervals = make([]int, 0)
 	packedBlocks = make([][]byte, 0)
 	for i, point := range points {
@@ -495,14 +505,14 @@ func packSequences(archive *archiveInfo, points []dataPoint) (intervals []int, p
 	This method retrieves the baseInterval and the
 */
 func (whisper *Whisper) getPointOffset(start int, archive *archiveInfo) int64 {
-	baseInterval := whisper.getBaseInterval(archive)
+	baseInterval := whisper.GetBaseInterval(archive)
 	if baseInterval == 0 {
 		return archive.Offset()
 	}
 	return archive.PointOffset(baseInterval, start)
 }
 
-func (whisper *Whisper) getBaseInterval(archive *archiveInfo) int {
+func (whisper *Whisper) GetBaseInterval(archive *archiveInfo) int {
 	baseInterval, err := whisper.readInt(archive.Offset())
 	if err != nil {
 		panic("Failed to read baseInterval")
@@ -531,7 +541,7 @@ func (whisper *Whisper) propagate(timestamp int, higher, lower *archiveInfo) (bo
 	relativeLastOffset := int64(mod(int(relativeFirstOffset+int64(higherSize)), higher.Size()))
 	higherLastOffset := relativeLastOffset + higher.Offset()
 
-	series := whisper.readSeries(higherFirstOffset, higherLastOffset, higher)
+	series := whisper.ReadSeries(higherFirstOffset, higherLastOffset, higher)
 
 	// and finally we construct a list of values
 	knownValues := make([]float64, 0, len(series))
@@ -560,7 +570,7 @@ func (whisper *Whisper) propagate(timestamp int, higher, lower *archiveInfo) (bo
 }
 
 // TODO: add error handling
-func (whisper *Whisper) readSeries(start, end int64, archive *archiveInfo) []dataPoint {
+func (whisper *Whisper) ReadSeries(start, end int64, archive *archiveInfo) []dataPoint {
 	var b []byte
 	if start < end {
 		b = make([]byte, end-start)
@@ -618,7 +628,7 @@ func (whisper *Whisper) Fetch(fromTime, untilTime int) (timeSeries *TimeSeries, 
 
 	fromInterval := archive.Interval(fromTime)
 	untilInterval := archive.Interval(untilTime)
-	baseInterval := whisper.getBaseInterval(&archive)
+	baseInterval := whisper.GetBaseInterval(&archive)
 
 	if baseInterval == 0 {
 		step := archive.secondsPerPoint
@@ -633,7 +643,7 @@ func (whisper *Whisper) Fetch(fromTime, untilTime int) (timeSeries *TimeSeries, 
 	fromOffset := archive.PointOffset(baseInterval, fromInterval)
 	untilOffset := archive.PointOffset(baseInterval, untilInterval)
 
-	series := whisper.readSeries(fromOffset, untilOffset, &archive)
+	series := whisper.ReadSeries(fromOffset, untilOffset, &archive)
 
 	values := make([]float64, len(series))
 	for i, _ := range values {
@@ -812,6 +822,24 @@ func (point *dataPoint) Bytes() []byte {
 	return b
 }
 
+func (d *dataPoint) Interval() int  { return d.interval }
+func (d *dataPoint) Value() float64 { return d.value }
+
+func NewDataPoint(interval int, value float64) dataPoint {
+	return dataPoint{interval: interval, value: value}
+}
+
+type DataPoints []dataPoint
+
+func (dps DataPoints) Len() int { return len(dps) }
+func (dps DataPoints) Less(i, j int) bool {
+	if dps[i].interval == 0 || dps[i].interval == 0 {
+		return false
+	}
+	return dps[i].interval < dps[j].interval
+}
+func (dps DataPoints) Swap(i, j int) { dps[i], dps[j] = dps[j], dps[i] }
+
 func sum(values []float64) float64 {
 	result := 0.0
 	for _, value := range values {
@@ -898,3 +926,8 @@ func unpackDataPoints(b []byte) (series []dataPoint) {
 func mod(a, b int) int {
 	return a - (b * int(math.Floor(float64(a)/float64(b))))
 }
+
+func (w *Whisper) AggregationMethod() AggregationMethod { return w.aggregationMethod }
+func (w *Whisper) XFF() float32                         { return w.xFilesFactor }
+func (w *Whisper) ArchiveInfos() []archiveInfo          { return w.archives }
+func (w *Whisper) File() *os.File                       { return w.file }
