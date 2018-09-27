@@ -1,0 +1,13 @@
+[Unit]
+Description=Buckyd graphite cluster service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/bin/bash -c '/usr/local/bin/buckyd -hash jump_fnv1 -node $GRAPHITE_HOST -prefix /var/lib/carbon/whisper -replicas 1 -sparse host1 host2 host3 &> /dev/null'
+Wants=network.target
+After=network.target
+
+[Install]
+WantedBy=multi-user.target

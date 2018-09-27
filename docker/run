@@ -1,0 +1,4 @@
+#!/bin/bash
+
+#exec /usr/local/bin/buckyd -hash jump_fnv1a -node $GRAPHITE_HOST -prefix /var/lib/graphite/whisper -replicas 1 -sparse host1 host2 host3 2>&1 >> /var/log/buckyd.log
+exec /usr/local/bin/buckyd -hash jump_fnv1a -node host1 -prefix /var/lib/graphite/whisper -replicas 1 -sparse host1 host2 host3 2>&1 >> /var/log/buckyd.log
