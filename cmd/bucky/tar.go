@@ -164,7 +164,7 @@ func multiplexTar(metricMap map[string][]string) error {
 				s = 1
 			}
 			rate := float64(c) / float64(s)
-			log.Printf("Progress %d / %d: %.2f%  wsp/s: %.2f  ETA: %s",
+			log.Printf("Progress %d / %d: %.2f%%  wsp/s: %.2f  ETA: %s",
 				c, l,
 				100*float64(c)/float64(l),
 				rate,
