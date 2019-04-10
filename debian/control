@@ -2,7 +2,7 @@ Source: buckytools
 Section: main
 Priority: optional
 Maintainer: Jack Neely <jjneely@42lines.net>
-Build-Depends: debhelper (>= 9.0.0), golang (>= 1.4), dh-golang, python-all
+Build-Depends: debhelper (>= 9.0.0), golang (>= 1.8), dh-golang, python-all
 Standards-Version: 3.9.7
 Homepage: https://github.com/jjneely/buckytools
 #Vcs-Git: git://git.debian.org/collab-maint/buckytools.git
