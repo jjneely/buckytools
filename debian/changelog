@@ -1,3 +1,12 @@
+buckytools (0.4.1) unstable; urgency=medium
+
+  * Change dependency on golang from 1.4+ to 1.8+ due to the use
+    of time.Until
+  * Fix printing of literal percent symbol in printf statement in
+    cmd/bucky/tar.go
+
+ -- Ryan Steele <ryan.g.steele@gmail.com>  Wed, 10 Apr 2019 08:48:55 -0400
+
 buckytools (0.4.0) unstable; urgency=medium
 
   * Support FNV1a hashing algorithm compatible with carbon-c-relay
