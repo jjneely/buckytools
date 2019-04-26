@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.4.2] - 2019-04-12
+### Added
+
+* Install systemd configuration files for bucky-pickle-relay
+
 ## [0.4.1] - 2019-04-10
 ### Changed
 

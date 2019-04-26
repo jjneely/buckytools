@@ -1,3 +1,9 @@
+buckytools (0.4.2) unstable; urgency=medium
+
+  * Install systemd configs for bucky-pickle-relay
+
+ -- Ryan Steele <ryan.g.steele@gmail.com>  Fri, 12 Apr 2019 10:09:08 -0400
+
 buckytools (0.4.1) unstable; urgency=medium
 
   * Change dependency on golang from 1.4+ to 1.8+ due to the use

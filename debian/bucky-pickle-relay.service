@@ -1,0 +1,13 @@
+[Unit]
+Description=bucky-pickle-relay
+Wants=carbon-c-relay.service
+After=carbon-c-relay.service network.target
+
+[Service]
+User=root
+Group=root
+EnvironmentFile=/etc/default/bucky-pickle-relay
+ExecStart=/usr/bin/bucky-pickle-relay $DAEMON_ARGS
+
+[Install]
+WantedBy=multi-user.target
