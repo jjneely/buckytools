@@ -63,7 +63,7 @@ func LocateJSONMetrics(fd io.Reader) map[string]string {
 
 	err = json.Unmarshal(blob, &metrics)
 	if err != nil {
-		log.Fatal("Error unmarshalling JSON data: %s", err)
+		log.Fatalf("Error unmarshalling JSON data: %s", err)
 	}
 
 	return LocateSliceMetrics(metrics)

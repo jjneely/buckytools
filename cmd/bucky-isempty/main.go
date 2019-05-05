@@ -8,12 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-)
 
-import (
 	"github.com/go-graphite/buckytools"
 	"github.com/go-graphite/buckytools/metrics"
-	"github.com/go-graphite/buckytools/whisper"
+	"github.com/go-graphite/go-whisper"
 )
 
 // Command Line Flags

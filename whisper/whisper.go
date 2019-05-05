@@ -833,7 +833,7 @@ type DataPoints []dataPoint
 
 func (dps DataPoints) Len() int { return len(dps) }
 func (dps DataPoints) Less(i, j int) bool {
-	if dps[i].interval == 0 || dps[i].interval == 0 {
+	if dps[i].interval == 0 || dps[j].interval == 0 {
 		return false
 	}
 	return dps[i].interval < dps[j].interval

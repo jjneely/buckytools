@@ -2,11 +2,10 @@ package fill
 
 import (
 	"math"
-	"sort"
 	"time"
-)
 
-import "github.com/go-graphite/buckytools/whisper"
+	"github.com/go-graphite/go-whisper"
+)
 
 // fillArchive() is a private function that fills data points from srcWSP
 // into dstWsp.  Used by FIll()
@@ -19,8 +18,6 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 	// Fetch the range defined by start and stop always taking the values
 	// from the highest precision archive, which man require multiple
 	// fetch/merge updates.
-	srcRetentions := whisper.RetentionsByPrecision{srcWsp.Retentions()}
-	sort.Sort(srcRetentions)
 
 	if start < srcWsp.StartTime() && stop < srcWsp.StartTime() {
 		// Nothing to fill/merge
@@ -28,7 +25,7 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 	}
 
 	// Begin our backwards walk in time
-	for _, v := range srcRetentions.Iterator() {
+	for _, v := range srcWsp.Retentions() {
 		points := make([]*whisper.TimeSeriesPoint, 0)
 		rTime := int(time.Now().Unix()) - v.MaxRetention()
 		if stop <= rTime {
@@ -54,7 +51,7 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 			}
 			tsStart += ts.Step()
 		}
-		dstWsp.UpdateManyWithRetention(points, v.MaxRetention())
+		dstWsp.UpdateManyForArchive(points, v.MaxRetention())
 
 		stop = fromTime
 		if start >= stop {
@@ -108,9 +105,7 @@ func All(source, dest string) error {
 // and matches its behavior exactly.
 func OpenWSP(srcWsp, dstWsp *whisper.Whisper, startTime int) error {
 	// Loop over each archive/retention, highest resolution first
-	dstRetentions := whisper.RetentionsByPrecision{dstWsp.Retentions()}
-	sort.Sort(dstRetentions)
-	for _, v := range dstRetentions.Iterator() {
+	for _, v := range dstWsp.Retentions() {
 		// fromTime is the earliest timestamp in this archive
 		fromTime := int(time.Now().Unix()) - v.MaxRetention()
 		if fromTime >= startTime {
