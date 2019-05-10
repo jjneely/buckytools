@@ -104,6 +104,10 @@ func All(source, dest string) error {
 // This code heavily inspired by https://github.com/jssjr/carbonate
 // and matches its behavior exactly.
 func OpenWSP(srcWsp, dstWsp *whisper.Whisper, startTime int) error {
+	if dstWsp.IsCompressed() {
+		return dstWsp.FillCompressed(srcWsp)
+	}
+
 	// Loop over each archive/retention, highest resolution first
 	for _, v := range dstWsp.Retentions() {
 		// fromTime is the earliest timestamp in this archive
