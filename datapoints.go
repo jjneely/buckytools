@@ -2,11 +2,10 @@ package buckytools
 
 import (
 	"math"
-	"sort"
 	"time"
-)
 
-import "github.com/go-graphite/buckytools/whisper"
+	"github.com/go-graphite/go-whisper"
+)
 
 // FindValidDataPoints does a backwards walk through time to examine the
 // highest resolution data for each archive / time period.  We collect valid
@@ -17,12 +16,10 @@ import "github.com/go-graphite/buckytools/whisper"
 func FindValidDataPoints(wsp *whisper.Whisper) ([]*whisper.TimeSeriesPoint, int, error) {
 	points := make([]*whisper.TimeSeriesPoint, 0)
 	count := 0
-	retentions := whisper.RetentionsByPrecision{wsp.Retentions()}
-	sort.Sort(retentions)
 
 	start := int(time.Now().Unix())
 	from := 0
-	for _, r := range retentions.Iterator() {
+	for _, r := range wsp.Retentions() {
 		from = int(time.Now().Unix()) - r.MaxRetention()
 
 		ts, err := wsp.Fetch(from, start)
@@ -30,7 +27,7 @@ func FindValidDataPoints(wsp *whisper.Whisper) ([]*whisper.TimeSeriesPoint, int,
 			return make([]*whisper.TimeSeriesPoint, 0, 0), 0, err
 		}
 		count = count + len(ts.Values())
-		for _, v := range ts.Points() {
+		for _, v := range ts.PointPointers() {
 			if !math.IsNaN(v.Value) {
 				points = append(points, v)
 			}

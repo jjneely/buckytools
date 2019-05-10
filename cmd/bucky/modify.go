@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	// TODO: migrate to github.com/go-graphite/go-whisper
 	"github.com/go-graphite/buckytools/whisper"
 )
 

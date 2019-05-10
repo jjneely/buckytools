@@ -9,9 +9,9 @@ import (
 	"os/exec"
 	"testing"
 	"time"
-)
 
-import "github.com/go-graphite/buckytools/whisper"
+	"github.com/go-graphite/go-whisper"
+)
 
 func whisperCreateData(path string, ts []*whisper.TimeSeriesPoint) error {
 	os.Remove(path) // Don't care if it fails
@@ -162,7 +162,7 @@ func fetchFromFile(path string) ([]*whisper.TimeSeriesPoint, error) {
 		return tsp, err
 	}
 
-	return ts.Points(), nil
+	return ts.PointPointers(), nil
 }
 
 func simulateFill(a, b []*whisper.TimeSeriesPoint) []*whisper.TimeSeriesPoint {
@@ -378,7 +378,7 @@ func TestTwoArchives(t *testing.T) {
 	}
 
 	if len(goFill) != len(pythonFill) {
-		t.Fatalf("length mismatch, python=%v, go=%v, expected=%v", len(goFill), len(pythonFill))
+		t.Fatalf("length mismatch, python=%v, go=%v", len(goFill), len(pythonFill))
 	}
 
 	// Now try to print out a table of C, D, Python, Go, Simu
