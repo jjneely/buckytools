@@ -72,12 +72,12 @@ func fillArchive(srcWsp, dstWsp *whisper.Whisper, start, stop int) error {
 //   walking backwards to the begining of the retentions.
 func Files(source, dest string, startTime int) error {
 	// Setup, open our files and error check
-	dstWsp, err := whisper.OpenWithOptions(dest, &whisper.Options{Flock: true})
+	dstWsp, err := whisper.OpenWithOptions(dest, &whisper.Options{FLock: true})
 	if err != nil {
 		return err
 	}
 	defer dstWsp.Close()
-	srcWsp, err := whisper.OpenWithOptions(source, &whisper.Options{Flock: true})
+	srcWsp, err := whisper.OpenWithOptions(source, &whisper.Options{FLock: true})
 	if err != nil {
 		return err
 	}
