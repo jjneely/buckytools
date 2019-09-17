@@ -2,7 +2,7 @@ package buckytools
 
 const (
 	// Buckytools suite version
-	Version = "0.4.1"
+	Version = "0.4.2"
 )
 
 // SupportedHashTypes is the string identifiers of the hashing algorithms

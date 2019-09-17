@@ -11,7 +11,7 @@ BUILDDIR   := $(shell perl -w -MDebian::Debhelper::Buildsystem::golang -e \
 	'print Debian::Debhelper::Buildsystem::golang->new()->get_builddir()')
 
 %:
-	dh $@ --buildsystem=golang --with=golang
+	dh $@ --buildsystem=golang --with=golang --with=systemd
 
 override_dh_auto_configure:
 	dh_auto_configure -O--buildsystem=golang
@@ -22,3 +22,11 @@ override_dh_auto_install:
 	dh_auto_install
 	# we don't want the golang source (yet?)
 	rm -r debian/$(DEBPKGNAME)/usr/share/gocode
+
+override_dh_installinit:
+	dh_systemd_enable -pbuckytools --name=bucky-pickle-relay bucky-pickle-relay.service
+	dh_installinit -pbuckytools --name=bucky-pickle-relay --no-start --noscripts
+	dh_systemd_start -pbuckytools bucky-pickle-relay.service
+
+override_dh_systemd_start:
+	echo "Not running dh_systemd_start"
