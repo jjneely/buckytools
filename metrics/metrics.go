@@ -38,8 +38,15 @@ type MetricsCacheType struct {
 
 var Prefix string
 
+// CacheTimeOut is the time in seconds that a metrics cache is considered
+// fresh.  If the update timestamp is less than time.Now() - timeout then
+// the cache must be refreshed.
+var CacheTimeOut int64
+
 // Init common bits
 func init() {
+	flag.Int64Var(&CacheTimeOut, "timeout", 3600,
+		"Maximum time in seconds metric keyspace cache is valid")
 	flag.StringVar(&Prefix, "prefix", "/opt/graphite/storage/whisper",
 		"The root of the whisper database store.")
 	flag.StringVar(&Prefix, "p", "/opt/graphite/storage/whisper",
@@ -189,10 +196,9 @@ func (m *MetricsCacheType) IsAvailable() bool {
 	return m.metrics != nil && !m.updating
 }
 
-// TimedOut returns true if the cache hasn't been refresed recently.
+// TimedOut returns true if the cache hasn't been refreshed recently.
 func (m *MetricsCacheType) TimedOut() bool {
-	// 1 hour cache timeout
-	return time.Now().Unix()-m.timestamp > 3600
+	return time.Now().Unix()-m.timestamp > CacheTimeOut
 }
 
 // RefreshCache updates the list of metric names in the cache from the local

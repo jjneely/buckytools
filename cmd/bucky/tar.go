@@ -163,10 +163,13 @@ func multiplexTar(metricMap map[string][]string) error {
 			if s == 0 {
 				s = 1
 			}
-			log.Printf("Progress %d / %d: %.2f  Metrics/second: %.2f",
+			rate := float64(c) / float64(s)
+			log.Printf("Progress %d / %d: %.2f%%  wsp/s: %.2f  ETA: %s",
 				c, l,
 				100*float64(c)/float64(l),
-				float64(c)/float64(s))
+				rate,
+				time.Until(time.Unix(int64(float64(l-c)/rate), 0)).String(),
+			)
 		}
 	}
 	close(workIn)

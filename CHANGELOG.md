@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.4.2] - 2019-04-12
+### Added
+
+* Install systemd configuration files for bucky-pickle-relay
+
+## [0.4.1] - 2019-04-10
+### Changed
+
+* Make Debian package depend on golang 1.8+ due to the use of `time.Until`
+
+* Add missing percent symbol in `cmd/bucky/tar.go` to fix a printf statement
+  where a literal percent symbol was intended. Fixes the following compile-
+  time error: `cmd/bucky/tar.go:167: Printf format %  w has unknown verb w`
+
 ## [0.4.0] - 2017-08-17
 ### Fixed
 * Fixed bug with backfilling metrics. See https://github.com/jjneely/buckytools/issues/19 for more information
