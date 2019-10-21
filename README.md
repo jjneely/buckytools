@@ -59,6 +59,7 @@ These are the tools included and their functionality.
   * **json** -- Convert newline separated lists to JSON arrays.
   * **list** -- Discover and verify metrics.
   * **locate** -- Calculate metric locations from the hash ring.
+  * **modify** -- Resize archive or change aggregation policy.
   * **rebalance** -- Move inconsistent metrics to the correct location
     and delete the source immediately after successful backfill.
   * **restore** -- Restore from a tar archive.
@@ -215,6 +216,33 @@ cron job similar to this:
 
 This checks that the directory has not been modified in more than 1 day
 which, in most cases, avoids race conditions.
+
+Modify command
+--------------
+
+Modify command supports two operations: resize, or update aggregation policy.
+
+Resize mode allows user to resize one archive at a time. It only change the
+targeting archive and does not affect other archives. Use `-index` to specify
+resized archives. Use `-retention` to specify new policy (with the same format in whisper
+configuration). To resize to bigger time range, modify command upsample data
+from lower-resolution archives.
+
+Example:
+
+	$ bucky modify -index 1 -retention 1m:30d -f 100_olddata.wsp
+
+Change aggregation policy. 
+Other than changing policy, this command would also
+try to correct data if it's changing policy from average -> sum, or sum -> average.
+For other types of changes, it would only do a simple data copy.
+
+Example:
+
+	$ bucky modify -f small.wsp.new -agg average
+
+By default, both tool would copy the original whisper file as a new back in the
+same location.
 
 Google Snappy Compression
 -------------------------
