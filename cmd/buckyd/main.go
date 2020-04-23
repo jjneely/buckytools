@@ -20,6 +20,7 @@ var hashring *hashing.JSONRingType
 
 // sparseFiles defines if we create and manage sparse files.
 var sparseFiles bool
+var compressed bool
 
 func usage() {
 	t := []string{
@@ -90,6 +91,8 @@ func main() {
 		fmt.Sprintf("Consistent Hash algorithm to use: %v", SupportedHashTypes))
 	flag.IntVar(&replicas, "replicas", 1,
 		"Number of copies of each metric in the cluster.")
+	flag.BoolVar(&compressed, "compressed", false,
+		"Create new whisper file in compressed format.")
 	flag.Parse()
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)

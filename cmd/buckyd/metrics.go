@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -11,12 +12,12 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/go-graphite/buckytools/fill"
+	. "github.com/go-graphite/buckytools/metrics"
+	whisper "github.com/go-graphite/go-whisper"
+	"github.com/golang/snappy"
 )
-
-import "github.com/golang/snappy"
-
-import . "github.com/go-graphite/buckytools/metrics"
-import "github.com/go-graphite/buckytools/fill"
 
 // listMetrics retrieves a list of metrics on the localhost and sends
 // it to the client.
@@ -272,6 +273,60 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 	} else {
+		if compressed {
+			bdata := bufio.NewReader(data)
+			data = bdata
+			magic := []byte("whisper_compressed")
+			magicFromData, err := bdata.Peek(len(magic))
+			if err != nil {
+				log.Printf("Failed to read compressed magic string: %s", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// src file is not compressed, dump it and compress it
+			if !bytes.Equal(magicFromData, magic) {
+				fd, err := ioutil.TempFile(tmpDir, "buckyd")
+				if err != nil {
+					log.Printf("Error creating temp file: %s", err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				nr, err := io.Copy(fd, data)
+				srcName := fd.Name()
+				fd.Close()
+				defer os.Remove(srcName) // not concerned with errors here
+				if err != nil || nr != stat.Size {
+					if err != nil {
+						log.Printf("Error writing to temp file: %s", err)
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					} else {
+						log.Printf("Decoded whisper file data does not match size %d != %d",
+							nr, stat.Size)
+						http.Error(w, "Malformed whisper data", http.StatusBadRequest)
+					}
+					return
+				}
+
+				srcw, err := whisper.Open(srcName)
+				if err != nil {
+					log.Printf("Failed to open source whisper file: %s", err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				defer srcw.Close()
+
+				if err := srcw.CompressTo(path); err != nil {
+					log.Printf("Failed to compress to whisper file %s: %s", path, err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				return
+			}
+
+			// src file is compressed, continue like standard whisper file, just copy it
+		}
+
 		// Open and lock destination
 		dst, err := os.Create(path)
 		if err != nil {
@@ -287,7 +342,7 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		}
 
 		var nr int64
-		if sparseFiles {
+		if sparseFiles && !compressed {
 			nr, err = copySparse(dst, data)
 		} else {
 			nr, err = io.Copy(dst, data)
