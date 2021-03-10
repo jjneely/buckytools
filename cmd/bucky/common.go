@@ -12,12 +12,12 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/golang/snappy"
+
+	"github.com/go-graphite/buckytools/hashing"
+	. "github.com/go-graphite/buckytools/metrics"
 )
-
-import "github.com/golang/snappy"
-
-import . "github.com/go-graphite/buckytools/metrics"
-import "github.com/go-graphite/buckytools/hashing"
 
 // HostPort is a convenience variable for sub-commands.  This holds the
 // HOST:PORT to connect to if SetupHostname() is called in init()
@@ -29,6 +29,9 @@ var NoEncoding bool
 
 // Verbose is a flag to indicate verbose logging
 var Verbose bool
+
+// Verbose is a flag to indicate verbose logging
+var HttpTimeout int
 
 // httpClient is a cached http.Client. Use GetHTTP() to setup and return.
 var httpClient *http.Client
@@ -46,7 +49,7 @@ func GetHTTP() *http.Client {
 			Dial: (&net.Dialer{
 				Timeout: 1 * time.Second,
 			}).Dial,
-			ResponseHeaderTimeout: 30 * time.Second,
+			ResponseHeaderTimeout: time.Duration(HttpTimeout) * time.Second,
 		},
 	}
 
@@ -388,6 +391,10 @@ func SetupCommon(c Command) {
 		"Verbose log output.")
 	c.Flag.BoolVar(&Verbose, "verbose", false,
 		"Verbose log output.")
+	c.Flag.IntVar(&HttpTimeout, "t", 30,
+		"Http timeout.")
+	c.Flag.IntVar(&HttpTimeout, "timeout", 30,
+		"Http timeout.")
 	c.Flag.BoolVar(&NoEncoding, "no-encoding", false,
 		"Disable Content-Encoding methods for HTTP API calls.")
 }
