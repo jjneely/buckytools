@@ -1,0 +1,23 @@
+# github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb
+## explicit
+github.com/go-graphite/go-whisper
+# github.com/golang/snappy v0.0.0-20170215233205-553a64147049
+## explicit
+github.com/golang/snappy
+# github.com/google/go-cmp v0.5.5
+## explicit
+# github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de
+## explicit
+github.com/kisielk/og-rek
+# github.com/kr/pretty v0.2.1
+## explicit
+# github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
+## explicit
+github.com/pborman/uuid
+# golang.org/x/crypto v0.0.0-20180306223934-85f98707c97e
+## explicit
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/sys v0.0.0-20180308025116-349b81fb5c64
+## explicit
+golang.org/x/sys/unix
+golang.org/x/sys/windows

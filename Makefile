@@ -6,28 +6,28 @@ PHONY: all
 all: $(targets)
 
 bucky:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 bucky-fill:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 bucky-isempty:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 bucky-pickle-relay:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 bucky-sparsify:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 buckyd:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 findhash:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 gentestmetrics:
-	go build ./cmd/$@
+	go build -mod vendor ./cmd/$@
 
 clean:
 	$(RM) $(targets)
