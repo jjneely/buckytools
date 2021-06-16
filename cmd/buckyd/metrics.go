@@ -4,10 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -197,30 +201,76 @@ func deleteMetric(w http.ResponseWriter, path string, fatal bool) error {
 func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 	var err error
 	var data io.Reader
+	var stat *MetricData
+	var stats struct {
+		Download time.Duration
+		Dump     time.Duration
+		Fill     time.Duration
+		Compress time.Duration
+		Copy     time.Duration
+	}
+	var hasError bool
+	httpError := func(w http.ResponseWriter, error string, code int) {
+		hasError = true
+		http.Error(w, error, code)
+	}
+	defer func() {
+		if hasError {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(stats); err != nil {
+			log.Printf("Failed to rerturn stats: %s", err)
+		}
+	}()
 
-	// Does this request look sane?
-	if r.Header.Get("Content-Type") != "application/octet-stream" {
-		http.Error(w, "Content-Type must be application/octet-stream.",
-			http.StatusBadRequest)
-		log.Printf("Got send a content-type of %s, abort!", r.Header.Get("Content-Type"))
-		return
-	}
-	if r.Header.Get("content-encoding") == "snappy" {
-		data = snappy.NewReader(r.Body)
+	if r.URL.Query().Get("fetch_offload") == "true" {
+		start := time.Now()
+
+		stat, err = getMetricData(r.FormValue("no_encoding") == "true", r.FormValue("server"), r.FormValue("metric"))
+		if err != nil {
+			if errors.Is(err, errNotFound) {
+				httpError(w, "Error fetching metric: "+err.Error(), http.StatusNotFound)
+				return
+			}
+
+			httpError(w, "Error fetching metric: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		data = bytes.NewReader(stat.Data)
+		if stat.Encoding == EncSnappy {
+			data = snappy.NewReader(data)
+		}
+
+		stats.Download = time.Since(start)
 	} else {
-		data = r.Body
+		// Does this request look sane?
+		if r.Header.Get("Content-Type") != "application/octet-stream" {
+			httpError(w, "Content-Type must be application/octet-stream.",
+				http.StatusBadRequest)
+			log.Printf("Got send a content-type of %s, abort!", r.Header.Get("Content-Type"))
+			return
+		}
+		if r.Header.Get("content-encoding") == "snappy" {
+			data = snappy.NewReader(r.Body)
+		} else {
+			data = r.Body
+		}
+
+		stat = new(MetricData)
+		err = json.Unmarshal([]byte(r.Header.Get("X-Metric-Stat")), &stat)
+		if err != nil {
+			log.Printf("Error decoding X-Metric-Stat header: %s", err)
+			httpError(w, "Error decoding X-Metric-Stat header", http.StatusBadRequest)
+			return
+		}
 	}
-	stat := new(MetricData)
-	err = json.Unmarshal([]byte(r.Header.Get("X-Metric-Stat")), &stat)
-	if err != nil {
-		log.Printf("Error decoding X-Metric-Stat header: %s", err)
-		http.Error(w, "Error decoding X-Metric-Stat header", http.StatusBadRequest)
-		return
-	}
+
 	if stat.Size <= 28 {
 		// Whisper file headers are 28 bytes and we need data too.
 		log.Printf("Whisper data in request too small: %d bytes", stat.Size)
-		http.Error(w, "Whisper data in request too small.", http.StatusBadRequest)
+		httpError(w, "Whisper data in request too small.", http.StatusBadRequest)
 		return
 	}
 
@@ -229,13 +279,13 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 	if _, err := os.Stat(path); err != nil {
 		if !os.IsNotExist(err) {
 			log.Printf("Error stat'ing file %s: %s", path, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		err := os.MkdirAll(filepath.Dir(path), 0755)
 		if err != nil {
 			log.Printf("Error creating %s: %s", filepath.Dir(path), err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		dstExists = false
@@ -243,24 +293,28 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 
 	if dstExists {
 		// Write request body to a tmpfile
+		tmpStart := time.Now()
 		fd, err := ioutil.TempFile(tmpDir, "buckyd")
 		if err != nil {
 			log.Printf("Error creating temp file: %s", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		nr, err := io.Copy(fd, data)
 		srcName := fd.Name()
 		fd.Close()
+		stats.Dump = time.Since(tmpStart)
+
+		fillStart := time.Now()
 		defer os.Remove(srcName) // not concerned with errors here
 		if err != nil || nr != stat.Size {
 			if err != nil {
 				log.Printf("Error writing to temp file: %s", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				httpError(w, err.Error(), http.StatusInternalServerError)
 			} else {
 				log.Printf("Decoded whisper file data does not match size %d != %d",
 					nr, stat.Size)
-				http.Error(w, "Malformed whisper data", http.StatusBadRequest)
+				httpError(w, "Malformed whisper data", http.StatusBadRequest)
 			}
 			return
 		}
@@ -269,9 +323,10 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		err = fill.All(srcName, path)
 		if err != nil {
 			log.Printf("Error backfilling %s => %s: %s", srcName, path, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		stats.Fill = time.Since(fillStart)
 	} else {
 		if compressed {
 			bdata := bufio.NewReader(data)
@@ -280,64 +335,71 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			magicFromData, err := bdata.Peek(len(magic))
 			if err != nil {
 				log.Printf("Failed to read compressed magic string: %s", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				httpError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			// src file is not compressed, dump it and compress it
 			if !bytes.Equal(magicFromData, magic) {
+				tmpStart := time.Now()
 				fd, err := ioutil.TempFile(tmpDir, "buckyd")
 				if err != nil {
 					log.Printf("Error creating temp file: %s", err)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					httpError(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 				nr, err := io.Copy(fd, data)
 				srcName := fd.Name()
 				fd.Close()
+				stats.Dump = time.Since(tmpStart)
+
 				defer os.Remove(srcName) // not concerned with errors here
 				if err != nil || nr != stat.Size {
 					if err != nil {
 						log.Printf("Error writing to temp file: %s", err)
-						http.Error(w, err.Error(), http.StatusInternalServerError)
+						httpError(w, err.Error(), http.StatusInternalServerError)
 					} else {
 						log.Printf("Decoded whisper file data does not match size %d != %d",
 							nr, stat.Size)
-						http.Error(w, "Malformed whisper data", http.StatusBadRequest)
+						httpError(w, "Malformed whisper data", http.StatusBadRequest)
 					}
 					return
 				}
 
+				compressStart := time.Now()
 				srcw, err := whisper.Open(srcName)
 				if err != nil {
 					log.Printf("Failed to open source whisper file: %s", err)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					httpError(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 				defer srcw.Close()
 
 				if err := srcw.CompressTo(path); err != nil {
 					log.Printf("Failed to compress to whisper file %s: %s", path, err)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					httpError(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
+				stats.Compress = time.Since(compressStart)
+
 				return
 			}
 
 			// src file is compressed, continue like standard whisper file, just copy it
 		}
 
+		copyStart := time.Now()
 		// Open and lock destination
 		dst, err := os.Create(path)
 		if err != nil {
 			log.Printf("Error opening metric file %s: %s", path, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer dst.Close()
 		if err = syscall.Flock(int(dst.Fd()), syscall.LOCK_EX); err != nil {
 			log.Printf("Error locking file %s: %s", path, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -350,16 +412,88 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 		if err != nil || nr != stat.Size {
 			if err != nil {
 				log.Printf("Error writing whisper data to %s: %s", path, err)
-				http.Error(w, "Error writing whisper data", http.StatusInternalServerError)
+				httpError(w, "Error writing whisper data", http.StatusInternalServerError)
 			} else {
 				log.Printf("Decoded whisper file data does not match size %d != %d",
 					nr, stat.Size)
-				http.Error(w, "Malformed whisper data", http.StatusBadRequest)
+				httpError(w, "Malformed whisper data", http.StatusBadRequest)
 			}
 			defer os.Remove(dst.Name()) // not concerned with errors here
 			return
 		}
+		stats.Copy = time.Since(copyStart)
 	}
+}
+
+var httpClient = &http.Client{
+	Timeout: 600 * time.Second,
+	Transport: &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: 1 * time.Second,
+		}).Dial,
+		IdleConnTimeout:       10 * time.Minute,
+		MaxIdleConnsPerHost:   300,
+		ResponseHeaderTimeout: time.Minute,
+	},
+}
+
+var errNotFound = errors.New("metric not found")
+
+func getMetricData(noEncoding bool, server, name string) (*MetricData, error) {
+	var err error
+	u := &url.URL{
+		Scheme: "http",
+		Host:   server,
+		Path:   "/metrics/" + name,
+	}
+	r, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		log.Printf("Error building request: %s", err)
+		return nil, err
+	}
+	if !noEncoding {
+		r.Header.Set("accept-encoding", "snappy")
+	}
+
+	resp, err := httpClient.Do(r)
+	if err != nil {
+		log.Printf("Error downloading metric data: %s", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("Error: Fetching [%s]:%s returned status code: %d  Body: %s",
+			server, name, resp.StatusCode, string(body))
+
+		if resp.StatusCode == 404 {
+			return nil, errNotFound
+		}
+
+		return nil, fmt.Errorf("Fetching metric returned status code: %s", resp.Status)
+	}
+
+	data := new(MetricData)
+	err = json.Unmarshal([]byte(resp.Header.Get("X-Metric-Stat")), &data)
+	if err != nil {
+		log.Printf("Error unmarshalling X-Metric-Stat header for [%s]:%s: %s", server, name, err)
+		return nil, err
+	}
+
+	data.Data, err = ioutil.ReadAll(resp.Body)
+	encoding := resp.Header.Get("Content-Encoding")
+	switch encoding {
+	case "snappy":
+		data.Encoding = EncSnappy
+	default:
+		data.Encoding = EncIdentity
+	}
+	if err != nil {
+		log.Printf("Error reading response body: %s", err)
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // serveMetric will serve a GET request for the metric that path

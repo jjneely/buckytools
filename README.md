@@ -156,7 +156,7 @@ use the `-no-delete` flag.  The default behavior is to move metrics and
 delete the source after a successful copy.
 
     $ bucky rebalance -h graphite010-g5:4242 \
-        -w 25 2>&1 | tee rebalance.log
+        -w 5 2>&1 | tee rebalance.log
 
 Discover the exact storage used by a set of metrics:
 
@@ -167,12 +167,17 @@ Make a backup of all of the metrics in the `carbon` namespace.  Using the
 [pigz][2] parallel gzip compression tool.  (Normal gzip would otherwise bottleneck
 the process.)
 
-    $ bucky tar -w 25 -r '^carbon\.' | pigz > filename.tar
+    $ bucky tar -w 5 -r '^carbon\.' | pigz > filename.tar
 
 Backfill or rename metrics with a JSON hash of old name to new name.  This
 does not delete the source metric.  It is a copy/fill operation.
 
-    $ bucky backfill -w 25 foo.json
+    $ bucky backfill -w 5 foo.json
+
+Offload backfilling to data nodes. This should be more performant as it saves one
+round trip by asking data nodes to copy data directly between each other.
+
+    $ bucky backfill -w 5  -h graphite010-g5:4242 -w 5 -offload
 
 Find inconsistent metrics or metrics that are in the wrong place in the
 cluster according to the hashring:

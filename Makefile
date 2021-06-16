@@ -29,5 +29,17 @@ findhash:
 gentestmetrics:
 	go build -mod vendor ./cmd/$@
 
+# To keep testdata after running test for debugging, run the following command:
+#
+# 	make test REBALANCE_FLAGS=-keep-testdata
+#
+test: clean bucky buckyd
+	go run -mod vendor testing/rebalance.go $(REBALANCE_FLAGS)
+	go run -mod vendor testing/copy.go $(COPY_FLAGS)
+
+clean_test:
+	rm -rf testdata_rebalance_*
+	rm -rf testdata_copy_*
+
 clean:
 	$(RM) $(targets)
