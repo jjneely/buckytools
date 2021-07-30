@@ -51,6 +51,8 @@ func GetHTTP() *http.Client {
 				Timeout: 1 * time.Second,
 			}).Dial,
 			ResponseHeaderTimeout: time.Duration(HttpTimeout) * time.Second,
+			IdleConnTimeout:       10 * time.Minute,
+			MaxIdleConnsPerHost:   300,
 		},
 	}
 
