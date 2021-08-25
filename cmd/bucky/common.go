@@ -306,7 +306,7 @@ func PostMetric(server string, metric *MetricData) (*metricHealStats, error) {
 	u.Host, err = SanitizeHostPort(server)
 	if err != nil {
 		log.Printf("Malformed hostname: %s", err)
-		return nil, nil
+		return nil, err
 	}
 
 	buf := bytes.NewBuffer(metric.Data)
@@ -371,7 +371,7 @@ func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
 	u.Host, err = SanitizeHostPort(dst)
 	if err != nil {
 		log.Printf("Malformed hostname: %s", err)
-		return nil, nil
+		return nil, err
 	}
 
 	resp, err := httpClient.PostForm(u.String(), url.Values{
@@ -406,7 +406,7 @@ func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
 	var stats metricHealStats
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		log.Printf("Failed to retrieve heal stats: %s", err)
-		return nil, nil
+		return nil, err
 	}
 
 	return &stats, nil
