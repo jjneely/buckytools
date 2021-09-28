@@ -71,7 +71,7 @@ func backfillWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
 			continue
 		}
 		metric.Name = work.newName
-		err = PostMetric(work.newLocation, metric)
+		_, err = PostMetric(work.newLocation, metric)
 		if err != nil {
 			// errors already handled
 			workerErrors = true

@@ -9,9 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-)
 
-import . "github.com/go-graphite/buckytools/metrics"
+	. "github.com/go-graphite/buckytools/metrics"
+)
 
 var tarPrefix string
 
@@ -65,7 +65,7 @@ func restoreTarWorker(workIn chan *MetricData, servers []string, wg *sync.WaitGr
 			continue
 		}
 		log.Printf("Uploading %s => %s", work.Name, server)
-		err := PostMetric(server, work)
+		_, err := PostMetric(server, work)
 		if err != nil {
 			workerErrors = true
 		}

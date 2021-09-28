@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -50,6 +51,8 @@ func GetHTTP() *http.Client {
 				Timeout: 1 * time.Second,
 			}).Dial,
 			ResponseHeaderTimeout: time.Duration(HttpTimeout) * time.Second,
+			IdleConnTimeout:       10 * time.Minute,
+			MaxIdleConnsPerHost:   300,
 		},
 	}
 
@@ -293,7 +296,7 @@ func StatRemoteMetric(server, metric string) (*MetricData, error) {
 
 // PostMetric sends a POST request with new metric data to the given server.
 // A post request does a backfill if this metric is already present on disk.
-func PostMetric(server string, metric *MetricData) error {
+func PostMetric(server string, metric *MetricData) (*metricHealStats, error) {
 	var err error
 	httpClient := GetHTTP()
 	u := &url.URL{
@@ -303,18 +306,18 @@ func PostMetric(server string, metric *MetricData) error {
 	u.Host, err = SanitizeHostPort(server)
 	if err != nil {
 		log.Printf("Malformed hostname: %s", err)
-		return nil
+		return nil, err
 	}
 
 	buf := bytes.NewBuffer(metric.Data)
 	r, err := http.NewRequest("POST", u.String(), buf)
 	if err != nil {
 		log.Printf("Error building request: %s", err)
-		return err
+		return nil, err
 	}
 	statInfo, err := json.Marshal(metric)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	r.Header.Set("X-Metric-Stat", string(statInfo))
 	r.Header.Set("Content-Type", "application/octet-stream")
@@ -327,7 +330,7 @@ func PostMetric(server string, metric *MetricData) error {
 	resp, err := httpClient.Do(r)
 	if err != nil {
 		log.Printf("Error communicating with server: %s", err)
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -335,10 +338,78 @@ func PostMetric(server string, metric *MetricData) error {
 		msg := fmt.Sprintf("Error reported by server: %s for metric %s",
 			resp.Status, metric.Name)
 		log.Printf("%s", msg)
-		return fmt.Errorf("%s", msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
 
-	return nil
+	var stats metricHealStats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		log.Printf("Failed to retrieve heal stats: %s", err)
+		return nil, nil
+	}
+
+	return &stats, nil
+}
+
+var errNotFound = errors.New("metric not found")
+
+type metricHealStats struct {
+	Download int64
+	Dump     int64
+	Fill     int64
+	Compress int64
+	Copy     int64
+}
+
+func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
+	var err error
+	httpClient := GetHTTP()
+	u := &url.URL{
+		Scheme:   "http",
+		Path:     "/metrics/" + metric,
+		RawQuery: "fetch_offload=true",
+	}
+	u.Host, err = SanitizeHostPort(dst)
+	if err != nil {
+		log.Printf("Malformed hostname: %s", err)
+		return nil, err
+	}
+
+	resp, err := httpClient.PostForm(u.String(), url.Values{
+		"no_encoding": {fmt.Sprintf("%t", NoEncoding)},
+		"server":      {src},
+		"metric":      {metric},
+	})
+	if err != nil {
+		log.Printf("Error communicating with server: %s", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Error on reading response body: %s", err)
+		}
+		msg := fmt.Sprintf("Error reported by server: %s for metric %s: %s",
+			resp.Status, metric, body)
+		log.Printf("%s", msg)
+
+		// Given that metrics could be periodically removed from storage backend,
+		// A 404 could be hanled differently.
+		if resp.StatusCode == 404 {
+			return nil, errNotFound
+		}
+
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	var stats metricHealStats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		log.Printf("Failed to retrieve heal stats: %s", err)
+		return nil, err
+	}
+
+	return &stats, nil
 }
 
 // GetSingleHashRing connects to the given server and returns a JSONRingType

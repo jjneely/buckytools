@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net"
-)
+	"strconv"
 
-import "github.com/go-graphite/buckytools/hashing"
+	"github.com/go-graphite/buckytools/hashing"
+)
 
 type ClusterConfig struct {
 	// Port is the port remote buckyd daemons listen on
@@ -34,7 +35,7 @@ func (c *ClusterConfig) HostPorts() []string {
 	}
 	ret := make([]string, 0)
 	for _, v := range c.Servers {
-		ret = append(ret, fmt.Sprintf("%s:%s", v, c.Port))
+		ret = append(ret, v)
 	}
 	return ret
 }
@@ -42,20 +43,20 @@ func (c *ClusterConfig) HostPorts() []string {
 // GetClusterConfig returns either the cached ClusterConfig object or
 // builds it if needed.  The initial HOST:PORT of the buckyd daemon
 // must be given.
-func GetClusterConfig(hostport string) (*ClusterConfig, error) {
+func GetClusterConfig(masterHostport string) (*ClusterConfig, error) {
 	if Cluster != nil {
 		return Cluster, nil
 	}
 
-	master, err := GetSingleHashRing(hostport)
+	master, err := GetSingleHashRing(masterHostport)
 	if err != nil {
 		log.Printf("Abort: Cannot communicate with initial buckyd daemon.")
 		return nil, err
 	}
 
-	_, port, err := net.SplitHostPort(hostport)
+	_, port, err := net.SplitHostPort(masterHostport)
 	if err != nil {
-		log.Printf("Abort: Invalid host:port representation: %s", hostport)
+		log.Printf("Abort: Invalid host:port representation: %s", masterHostport)
 		return nil, err
 	}
 
@@ -74,21 +75,28 @@ func GetClusterConfig(hostport string) (*ClusterConfig, error) {
 		return nil, fmt.Errorf("Unknown consistent hash algorithm: %s", master.Algo)
 	}
 
+	porti, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, fmt.Errorf("Abort: Failed to parse master port: %s", err)
+	}
+
 	for _, v := range master.Nodes {
+		if v.Port == 0 {
+			v.Port = porti
+		}
 		Cluster.Hash.AddNode(v)
-		Cluster.Servers = append(Cluster.Servers, v.Server)
+		Cluster.Servers = append(Cluster.Servers, fmt.Sprintf("%s:%d", v.Server, v.Port))
 	}
 
 	members := make([]*hashing.JSONRingType, 0)
 	for _, srv := range Cluster.Servers {
-		if srv == master.Name {
+		if srv == masterHostport {
 			// Don't query the initial daemon again
 			continue
 		}
-		host := fmt.Sprintf("%s:%s", srv, Cluster.Port)
-		member, err := GetSingleHashRing(host)
+		member, err := GetSingleHashRing(srv)
 		if err != nil {
-			log.Printf("Cluster unhealthy: %s: %s", host, err)
+			log.Printf("Cluster unhealthy: %s: %s", srv, err)
 		}
 		members = append(members, member)
 	}

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"sync"
-	"time"
 )
 
 var doDelete bool
 var noOp bool
+var offloadFetch bool
+var ignore404 bool
 
 func init() {
 	usage := "[options] [additional buckyd servers...]"
@@ -38,7 +38,9 @@ The --no-op option will not alter any metrics and print a report of what
 would have been done.
 
 Set -w to change the number of worker threads used to upload the Whisper
-DBs to the remote servers.`
+DBs to the remote servers.
+
+Set -offload=true to speed up rebalance.`
 
 	c := NewCommand(rebalanceCommand, "rebalance", usage, short, long)
 	SetupCommon(c)
@@ -55,38 +57,10 @@ DBs to the remote servers.`
 		"Downloader threads.")
 	c.Flag.BoolVar(&listForce, "f", false,
 		"Force the remote daemons to rebuild their cache.")
-}
-
-func rebalanceWorker(workIn chan *MigrateWork, wg *sync.WaitGroup) {
-	for work := range workIn {
-		if Verbose {
-			log.Printf("Relocating [%s] %s => [%s] %s  Delete Source: %t",
-				work.oldLocation, work.oldName,
-				work.newLocation, work.newName, doDelete)
-		}
-		metric, err := GetMetricData(work.oldLocation, work.oldName)
-		if err != nil {
-			// errors already handled
-			workerErrors = true
-			continue
-		}
-		metric.Name = work.newName
-		err = PostMetric(work.newLocation, metric)
-		if err != nil {
-			// errors already handled
-			workerErrors = true
-			continue
-		}
-
-		// We only delete if there are no errors present
-		if doDelete {
-			err = DeleteMetric(work.oldLocation, work.oldName)
-			if err != nil {
-				workerErrors = true
-			}
-		}
-	}
-	wg.Done()
+	c.Flag.BoolVar(&offloadFetch, "offload", false,
+		"Offload metric data fetching to data nodes.")
+	c.Flag.BoolVar(&ignore404, "ignore404", false,
+		"Do not treat 404 as errors.")
 }
 
 // countMap returns the number of metrics in a server -> metrics mapping
@@ -124,34 +98,29 @@ func RebalanceMetrics(extraHostPorts []string) error {
 		return nil
 	}
 
-	l := countMap(metricMap)
-	log.Printf("Relocating %d metrics.", l)
-	workIn := make(chan *MigrateWork, 25)
-	wg := new(sync.WaitGroup)
-	wg.Add(metricWorkers)
-	for i := 0; i < metricWorkers; i++ {
-		go rebalanceWorker(workIn, wg)
-	}
-
 	// build an order of jobs not dependent on location
-	jobs := make(map[string]*MigrateWork)
 	moves := make(map[string]int)
 	servers := make([]string, 0)
-	for server, metrics := range metricMap {
-		servers = append(servers, server)
+	jobs := map[string]map[string][]*syncJob{}
+	for src, metrics := range metricMap {
+		servers = append(servers, src)
 		for _, m := range metrics {
-			work := new(MigrateWork)
-			work.oldName = m
-			work.newName = m
-			work.oldLocation = server
-			work.newLocation = Cluster.Hash.GetNode(work.newName).Server
+			job := new(syncJob)
+			node := Cluster.Hash.GetNode(m)
+			dst := fmt.Sprintf("%s:%d", node.Server, node.Port)
 
-			id := fmt.Sprintf("[%s] %s", server, m)
-			jobs[id] = work
-			moves[server]++
+			job.oldName = m
+			job.newName = m
+
+			moves[src]++
+
+			if _, ok := jobs[dst]; !ok {
+				jobs[dst] = map[string][]*syncJob{}
+			}
+			jobs[dst][src] = append(jobs[dst][src], job)
 
 			if noOp {
-				log.Printf("%s => %s", id, work.newLocation)
+				log.Printf("[%s] %s => %s", src, m, dst)
 			}
 		}
 	}
@@ -161,39 +130,10 @@ func RebalanceMetrics(extraHostPorts []string) error {
 		log.Printf("%d metrics on %s must be relocated", moves[server], server)
 	}
 
-	if noOp {
-		close(workIn)
-		log.Fatal("Halting.  No-op mode enganged.")
-	}
+	ms := newMetricSyncer(doDelete, noOp, offloadFetch, ignore404, Verbose, metricWorkers)
 
-	// Queue up and process work
-	c := 0
-	t := time.Now().Unix()
-	for work := range jobs {
-		workIn <- jobs[work]
-		c++
-		if c%10 == 0 {
-			now := time.Now().Unix()
-			s := now - t
-			if s == 0 {
-				s = 1
-			}
-			log.Printf("Progress %d / %d: %.2f%%  Metrics/second: %.2f  Delete: %t",
-				c, l,
-				100*float64(c)/float64(l),
-				float64(c)/float64(s),
-				doDelete)
-		}
-	}
+	ms.run(jobs)
 
-	close(workIn)
-	wg.Wait()
-
-	log.Printf("Rebalance complete.")
-	if workerErrors {
-		log.Printf("Errors are present in rebalance.")
-		return fmt.Errorf("Errors present.")
-	}
 	return nil
 }
 
