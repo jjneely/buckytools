@@ -83,14 +83,16 @@ func (ms *metricSyncer) run(jobsd map[string]map[string][]*syncJob) error {
 			// Why src nodes have 1.5x workers: eading data is less
 			// expensive than writing data, so it should be ok for
 			// source node to receive some more reading requests.
-			srcThrottling[src] = make(chan struct{}, ms.flags.workers+ms.flags.workers/2)
-
-			for i := 0; i < ms.flags.workers; i++ {
-				totalWorkers++
-
-				workerWg.Add(1)
-				go ms.sync(jobc, srcThrottling, workerWg)
+			if _, ok := srcThrottling[src]; !ok {
+				srcThrottling[src] = make(chan struct{}, ms.flags.workers+ms.flags.workers/2)
 			}
+		}
+
+		for i := 0; i < ms.flags.workers; i++ {
+			totalWorkers++
+
+			workerWg.Add(1)
+			go ms.sync(jobc, srcThrottling, workerWg)
 		}
 	}
 
