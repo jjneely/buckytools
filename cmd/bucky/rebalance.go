@@ -4,7 +4,12 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 )
+
+var rebalanceConfig struct {
+	allowedDsts string
+}
 
 func init() {
 	usage := "[options] [additional buckyd servers...]"
@@ -43,8 +48,8 @@ Set -offload=true to speed up rebalance.`
 	SetupSingle(c)
 
 	msFlags.registerFlags(c.Flag)
-	c.Flag.BoolVar(&listForce, "f", false,
-		"Force the remote daemons to rebuild their cache.")
+	c.Flag.BoolVar(&listForce, "f", false, "Force the remote daemons to rebuild their cache.")
+	c.Flag.StringVar(&rebalanceConfig.allowedDsts, "allowed-dsts", "", "Only copy/rebanace metrics to the allowed destinations (ip1:port,ip2:port). By default (i.e. empty), all dsts are allowed.")
 }
 
 // countMap returns the number of metrics in a server -> metrics mapping
@@ -107,6 +112,23 @@ func RebalanceMetrics(extraHostPorts []string) error {
 				log.Printf("[%s] %s => %s", src, m, dst)
 			}
 		}
+	}
+
+	if rebalanceConfig.allowedDsts != "" {
+		allowm := map[string]bool{}
+		for _, hostport := range strings.Split(rebalanceConfig.allowedDsts, ";") {
+			allowm[strings.TrimSpace(hostport)] = true
+		}
+
+		newJobs := map[string]map[string][]*syncJob{}
+		for dst, srcm := range jobs {
+			if allowm[dst] {
+				newJobs[dst] = srcm
+			}
+
+		}
+
+		jobs = newJobs
 	}
 
 	sort.Strings(servers)

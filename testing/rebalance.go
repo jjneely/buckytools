@@ -152,7 +152,13 @@ func main() {
 
 	time.Sleep(time.Second * 3)
 	rebalanceStart := time.Now()
-	rebalanceCmd := exec.Command("./bucky", "rebalance", "-f", "-h", nodeStr(server0), "-offload", "-w", "3", "-ignore404")
+	rebalanceCmd := exec.Command(
+		"./bucky", "rebalance", "-f",
+		"-h", nodeStr(server0), "-offload",
+		"-w", "3", "-ignore404",
+		// "-allowed-dsts", "localhost:40002",
+		// "-allowed-dsts", "xxx:xxx",
+	)
 
 	rebalanceCmd.Stdout = rebalanceLog
 	rebalanceCmd.Stderr = rebalanceLog
