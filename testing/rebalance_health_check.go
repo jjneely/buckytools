@@ -4,9 +4,12 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	mrand "math/rand"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,7 +39,7 @@ func main() {
 		}
 	}()
 
-	testDir, err := os.MkdirTemp("./", "testdata_rebalance_*")
+	testDir, err := os.MkdirTemp("./", "testdata_rebalance_health_check_*")
 	if err != nil {
 		panic(err)
 	}
@@ -63,10 +66,13 @@ func main() {
 		panic(err)
 	}
 
+	// sudo ip addr add 10.0.1.7 dev lo
+	// sudo ip addr add 10.0.1.8 dev lo
+	// sudo ip addr add 10.0.1.9 dev lo
 	var (
-		server0 = hashing.Node{Server: "localhost", Port: 40000, Instance: "server0"}
-		server1 = hashing.Node{Server: "localhost", Port: 40001, Instance: "server1"}
-		server2 = hashing.Node{Server: "localhost", Port: 40002, Instance: "server2"}
+		server0 = hashing.Node{Server: "10.0.1.7", Port: 40000, Instance: "server0"}
+		server1 = hashing.Node{Server: "10.0.1.8", Port: 40001, Instance: "server1"}
+		server2 = hashing.Node{Server: "10.0.1.9", Port: 40002, Instance: "server2"}
 	)
 
 	if err := os.MkdirAll(filepath.Join(testDir, "server0"), 0755); err != nil {
@@ -77,6 +83,56 @@ func main() {
 	}
 	if err := os.MkdirAll(filepath.Join(testDir, "server2"), 0755); err != nil {
 		panic(err)
+	}
+
+	go func() {
+		tcpAddr, err := net.ResolveTCPAddr("tcp4", "127.0.0.1:33002")
+		if err != nil {
+			log.Printf("Failed to resolve 127.0.0.1:33002: %s", err)
+			os.Exit(1)
+		}
+		listener, err := net.ListenTCP("tcp", tcpAddr)
+		if err != nil {
+			log.Printf("Failed to listen 127.0.0.1:33002: %s", err)
+			os.Exit(1)
+		}
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Printf("Failed to accept graphite data: %s", err)
+				continue
+			}
+			data, err := ioutil.ReadAll(conn)
+			if err != nil {
+				continue
+			}
+			log.Printf("metrics:\n%s\n", data)
+			conn.Close()
+		}
+	}()
+
+	for _, node := range []hashing.Node{server0, server1, server2} {
+		go func(node hashing.Node) {
+			mux := http.NewServeMux()
+			start := time.Now()
+			mux.HandleFunc("/admin/info", func(w http.ResponseWriter, r *http.Request) {
+				if time.Since(start) >= time.Second*10 && time.Since(start) <= time.Second*20 {
+					fmt.Fprintf(w, `{"cache": {"size": 1000, "limit": 100000}}`)
+				} else {
+					fmt.Fprintf(w, `{"cache": {"size": 1000, "limit": 1000}}`)
+				}
+			})
+
+			s := &http.Server{
+				Addr:           fmt.Sprintf("%s:8080", node.Server),
+				Handler:        mux,
+				ReadTimeout:    10 * time.Second,
+				WriteTimeout:   10 * time.Second,
+				MaxHeaderBytes: 1 << 20,
+			}
+
+			log.Fatal(s.ListenAndServe())
+		}(node)
 	}
 
 	cmd0 := exec.Command("./buckyd", "-hash", "jump_fnv1a", "-b", nodeStr(server0), "-node", server0.Server, "-prefix", filepath.Join(testDir, "server0"), "-replicas", "1", "-sparse", nodeStr(server0), nodeStr(server1), nodeStr(server2))
@@ -152,12 +208,23 @@ func main() {
 
 	time.Sleep(time.Second * 3)
 	rebalanceStart := time.Now()
+	// rebalanceCmd := exec.Command("./bucky", "rebalance", "-f", "-h", nodeStr(server0), "-offload", "-w", "3", "-ignore404")
 	rebalanceCmd := exec.Command(
-		"./bucky", "rebalance", "-f",
-		"-h", nodeStr(server0), "-offload",
-		"-w", "3", "-ignore404",
-		// "-allowed-dsts", "localhost:40002",
-		// "-allowed-dsts", "xxx:xxx",
+		"./bucky", "rebalance", "-f", "-h", nodeStr(server0),
+		"-offload", "-ignore404",
+		"-testing.worker-sleep-seconds", "10",
+		"-graphite-ip-to-hostname",
+		"-graphite-metrics-prefix", "carbon.minutely.buckytool.rebalance.misc.dst.ams4a.src.ams4b",
+		"-graphite-endpoint", "127.0.0.1:33002",
+		"-graphite-stat-interval", "3",
+		"-go-carbon-health-check=true",
+		"-go-carbon-health-check-interval", "3",
+		"-go-carbon-port", "8080",
+		"-go-carbon-protocol", "http",
+		"-go-carbon-cache-threshold", "0.75",
+		// "-min-workers", "2",
+		"-sync-speed-up-interval", "2",
+		"-workers", "10",
 	)
 
 	rebalanceCmd.Stdout = rebalanceLog

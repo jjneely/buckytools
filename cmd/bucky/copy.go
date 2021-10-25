@@ -5,7 +5,7 @@ import "log"
 type copyCommand struct {
 	src, dst  string
 	listForce bool
-	metricSyncer
+	*metricSyncer
 }
 
 func init() {
@@ -20,15 +20,13 @@ func init() {
 	SetupHostname(c)
 	SetupSingle(c)
 
-	// c.Flag.BoolVar(&doDelete, "delete", false, "Delete metrics after moving them.")
 	c.Flag.StringVar(&copyCmd.src, "src", "", "Source host to copy metrics from.")
 	c.Flag.StringVar(&copyCmd.dst, "dst", "", "Destination host to copy metrics to.")
-	c.Flag.BoolVar(&copyCmd.flags.noop, "no-op", false, "Do not alter metrics and print report.")
-	c.Flag.IntVar(&copyCmd.flags.workers, "w", 5, "Downloader threads.")
-	c.Flag.IntVar(&copyCmd.flags.workers, "workers", 5, "Downloader threads.")
 	c.Flag.BoolVar(&copyCmd.listForce, "f", false, "Force the remote daemons to rebuild their cache.")
-	c.Flag.BoolVar(&copyCmd.flags.offloadFetch, "offload", false, "Offload metric data fetching to data nodes.")
-	c.Flag.BoolVar(&copyCmd.flags.ignore404, "ignore404", false, "Do not treat 404 as errors.")
+
+	msFlags.registerFlags(c.Flag)
+
+	copyCmd.metricSyncer = newMetricSyncer(msFlags)
 }
 
 // rebalanceCommand runs this subcommand.

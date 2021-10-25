@@ -183,6 +183,7 @@ func multiplexListRequests(r []metricListRequest) (map[string][]string, error) {
 				// Errors reported by getMetricsCache
 				comms <- metrics
 			} else {
+				log.Printf("Failed to retrieve metric list from %s: %s", req.url, err)
 				errors = true
 			}
 			wg.Done()

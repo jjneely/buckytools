@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 )
 
-var doDelete bool
-var noOp bool
-var offloadFetch bool
-var ignore404 bool
+var rebalanceConfig struct {
+	allowedDsts string
+}
 
 func init() {
 	usage := "[options] [additional buckyd servers...]"
@@ -47,20 +47,9 @@ Set -offload=true to speed up rebalance.`
 	SetupHostname(c)
 	SetupSingle(c)
 
-	c.Flag.BoolVar(&doDelete, "delete", false,
-		"Delete metrics after moving them.")
-	c.Flag.BoolVar(&noOp, "no-op", false,
-		"Do not alter metrics and print report.")
-	c.Flag.IntVar(&metricWorkers, "w", 5,
-		"Downloader threads.")
-	c.Flag.IntVar(&metricWorkers, "workers", 5,
-		"Downloader threads.")
-	c.Flag.BoolVar(&listForce, "f", false,
-		"Force the remote daemons to rebuild their cache.")
-	c.Flag.BoolVar(&offloadFetch, "offload", false,
-		"Offload metric data fetching to data nodes.")
-	c.Flag.BoolVar(&ignore404, "ignore404", false,
-		"Do not treat 404 as errors.")
+	msFlags.registerFlags(c.Flag)
+	c.Flag.BoolVar(&listForce, "f", false, "Force the remote daemons to rebuild their cache.")
+	c.Flag.StringVar(&rebalanceConfig.allowedDsts, "allowed-dsts", "", "Only copy/rebanace metrics to the allowed destinations (ip1:port,ip2:port). By default (i.e. empty), all dsts are allowed.")
 }
 
 // countMap returns the number of metrics in a server -> metrics mapping
@@ -119,10 +108,27 @@ func RebalanceMetrics(extraHostPorts []string) error {
 			}
 			jobs[dst][src] = append(jobs[dst][src], job)
 
-			if noOp {
+			if msFlags.noop {
 				log.Printf("[%s] %s => %s", src, m, dst)
 			}
 		}
+	}
+
+	if rebalanceConfig.allowedDsts != "" {
+		allowm := map[string]bool{}
+		for _, hostport := range strings.Split(rebalanceConfig.allowedDsts, ";") {
+			allowm[strings.TrimSpace(hostport)] = true
+		}
+
+		newJobs := map[string]map[string][]*syncJob{}
+		for dst, srcm := range jobs {
+			if allowm[dst] {
+				newJobs[dst] = srcm
+			}
+
+		}
+
+		jobs = newJobs
 	}
 
 	sort.Strings(servers)
@@ -130,7 +136,7 @@ func RebalanceMetrics(extraHostPorts []string) error {
 		log.Printf("%d metrics on %s must be relocated", moves[server], server)
 	}
 
-	ms := newMetricSyncer(doDelete, noOp, offloadFetch, ignore404, Verbose, metricWorkers)
+	ms := newMetricSyncer(msFlags)
 
 	ms.run(jobs)
 

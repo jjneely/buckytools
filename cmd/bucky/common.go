@@ -157,7 +157,9 @@ func DeleteMetric(server, metric string) error {
 
 	switch resp.StatusCode {
 	case 200:
-		log.Printf("DELETED: %s", metric)
+		if msFlags.printDeletedMetrics {
+			log.Printf("DELETED: %s", metric)
+		}
 	case 404:
 		log.Printf("Not found / Not deleted: %s", metric)
 		return fmt.Errorf("Metric not found.")
