@@ -492,11 +492,11 @@ func (ms *metricSyncer) newGoCarbonState(addr string, speedUpInterval int) *goCa
 		for {
 			select {
 			case <-state.fastReset:
-				atomic.StoreInt64(&state.metricsPerSecond, 1)
+				atomic.StoreInt64(&state.metricsPerSecond, mps)
 				speed.Reset(time.Second / time.Duration(state.metricsPerSecond))
 			case <-speedUp.C:
 				if ms.isGoCarbonOverload(state) { // overload check
-					atomic.StoreInt64(&state.metricsPerSecond, 1)
+					atomic.StoreInt64(&state.metricsPerSecond, mps)
 				} else if !ms.flags.noRandomEasing &&
 					atomic.LoadInt64(&state.metricsPerSecond) >= 30 &&
 					rand.Intn(10) <= 2 { // random easing
