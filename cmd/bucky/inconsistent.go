@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -51,22 +50,19 @@ func InconsistentMetrics(hostports []string) (map[string][]string, error) {
 	log.Printf("Hashing...")
 	t := time.Now().Unix()
 	for server, metrics := range list {
-		host, port, err := net.SplitHostPort(server)
+		host, _, err := net.SplitHostPort(server)
 		if err != nil {
 			log.Printf("Malformed hostname: %s", server)
 			return nil, err
 		}
-		if port == "" {
-			port = Cluster.Port
-			server = host + ":" + port
-		}
+
 		for _, m := range metrics {
 			if strings.HasPrefix(m, "carbon.agents.") {
 				// These metrics are inserted into the stream after hashing
 				// is done.  They will never be consistent and shouldn't be.
 				continue
 			}
-			if n := Cluster.Hash.GetNode(m); n.Server != host || strconv.Itoa(n.Port) != port {
+			if Cluster.Hash.GetNode(m).Server != host {
 				results[server] = append(results[server], m)
 			}
 		}

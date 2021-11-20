@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 
 	"github.com/go-graphite/buckytools/hashing"
 )
@@ -35,7 +34,7 @@ func (c *ClusterConfig) HostPorts() []string {
 	}
 	ret := make([]string, 0)
 	for _, v := range c.Servers {
-		ret = append(ret, v)
+		ret = append(ret, fmt.Sprintf("%s:%s", v, c.Port))
 	}
 	return ret
 }
@@ -75,28 +74,21 @@ func GetClusterConfig(masterHostport string) (*ClusterConfig, error) {
 		return nil, fmt.Errorf("Unknown consistent hash algorithm: %s", master.Algo)
 	}
 
-	porti, err := strconv.Atoi(port)
-	if err != nil {
-		return nil, fmt.Errorf("Abort: Failed to parse master port: %s", err)
-	}
-
 	for _, v := range master.Nodes {
-		if v.Port == 0 {
-			v.Port = porti
-		}
 		Cluster.Hash.AddNode(v)
-		Cluster.Servers = append(Cluster.Servers, fmt.Sprintf("%s:%d", v.Server, v.Port))
+		Cluster.Servers = append(Cluster.Servers, v.Server)
 	}
 
 	members := make([]*hashing.JSONRingType, 0)
 	for _, srv := range Cluster.Servers {
-		if srv == masterHostport {
+		if srv == master.Name {
 			// Don't query the initial daemon again
 			continue
 		}
-		member, err := GetSingleHashRing(srv)
+		host := fmt.Sprintf("%s:%s", srv, Cluster.Port)
+		member, err := GetSingleHashRing(host)
 		if err != nil {
-			log.Printf("Cluster unhealthy: %s: %s", srv, err)
+			log.Printf("Cluster unhealthy: %s: %s", host, err)
 		}
 		members = append(members, member)
 	}
