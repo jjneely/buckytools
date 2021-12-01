@@ -96,7 +96,7 @@ func RebalanceMetrics(extraHostPorts []string) error {
 		for _, m := range metrics {
 			job := new(syncJob)
 			node := Cluster.Hash.GetNode(m)
-			dst := fmt.Sprintf("%s:%d", node.Server, node.Port)
+			dst := fmt.Sprintf("%s:%s", node.Server, Cluster.Port)
 
 			job.oldName = m
 			job.newName = m
@@ -125,7 +125,6 @@ func RebalanceMetrics(extraHostPorts []string) error {
 			if allowm[dst] {
 				newJobs[dst] = srcm
 			}
-
 		}
 
 		jobs = newJobs
