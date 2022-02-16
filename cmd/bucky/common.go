@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/snappy"
@@ -20,6 +21,8 @@ import (
 	. "github.com/go-graphite/buckytools/metrics"
 )
 
+const buckydAuthHeader = "X-Buckyd-Authorization"
+
 // HostPort is a convenience variable for sub-commands.  This holds the
 // HOST:PORT to connect to if SetupHostname() is called in init()
 var HostPort string
@@ -27,6 +30,10 @@ var HostPort string
 // NoEncoding is a flag to disable compression of transferred Whisper
 // files.  Or other possible encodings of transferred files.
 var NoEncoding bool
+
+// APITokenFile is a flag to include a jwt token in the API request to
+// buckyd.
+var APITokenFile string
 
 // Verbose is a flag to indicate verbose logging
 var Verbose bool
@@ -148,6 +155,8 @@ func DeleteMetric(server, metric string) error {
 		return err
 	}
 
+	injectAuthHeaderIfEnabled(r)
+
 	resp, err := httpClient.Do(r)
 	if err != nil {
 		log.Printf("Error communicating: %s", err)
@@ -202,6 +211,8 @@ func GetMetricData(server, name string) (*MetricData, error) {
 		r.Header.Set("accept-encoding", "snappy")
 	}
 
+	injectAuthHeaderIfEnabled(r)
+
 	resp, err := httpClient.Do(r)
 	if err != nil {
 		log.Printf("Error downloading metric data: %s", err)
@@ -255,6 +266,8 @@ func StatRemoteMetric(server, metric string) (*MetricData, error) {
 		log.Printf("Error building request: %s", err)
 		return nil, err
 	}
+
+	injectAuthHeaderIfEnabled(r)
 
 	resp, err := httpClient.Do(r)
 	if err != nil {
@@ -321,6 +334,7 @@ func PostMetric(server string, metric *MetricData) (*metricHealStats, error) {
 	if err != nil {
 		return nil, err
 	}
+	injectAuthHeaderIfEnabled(r)
 	r.Header.Set("X-Metric-Stat", string(statInfo))
 	r.Header.Set("Content-Type", "application/octet-stream")
 	switch metric.Encoding {
@@ -376,11 +390,19 @@ func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
 		return nil, err
 	}
 
-	resp, err := httpClient.PostForm(u.String(), url.Values{
+	r, err := http.NewRequest("POST", u.String(), strings.NewReader(url.Values{
 		"no_encoding": {fmt.Sprintf("%t", NoEncoding)},
 		"server":      {src},
 		"metric":      {metric},
-	})
+	}.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	injectAuthHeaderIfEnabled(r)
+
+	resp, err := httpClient.Do(r)
 	if err != nil {
 		log.Printf("Error communicating with server: %s", err)
 		return nil, err
@@ -431,6 +453,7 @@ func GetSingleHashRing(server string) (*hashing.JSONRingType, error) {
 		log.Printf("Error building request: %s", err)
 		return nil, err
 	}
+	injectAuthHeaderIfEnabled(r)
 	resp, err := httpClient.Do(r)
 	if err != nil {
 		log.Printf("Error retrieving URL: %s", err)
@@ -470,6 +493,8 @@ func SetupCommon(c Command) {
 		"Http timeout.")
 	c.Flag.BoolVar(&NoEncoding, "no-encoding", false,
 		"Disable Content-Encoding methods for HTTP API calls.")
+	c.Flag.StringVar(&APITokenFile, "api-token-file", "",
+		"Include the content of the token file in the header of the API calls to buckyd.")
 }
 
 // SetupHostname sets up a generic find the host to connect to flag
@@ -532,4 +557,28 @@ func CleanMetric(m string) string {
 	}
 
 	return m
+}
+
+var apiTokenContent struct {
+	once  sync.Once
+	token string
+}
+
+func injectAuthHeaderIfEnabled(r *http.Request) {
+	if APITokenFile == "" {
+		// API token not enabled, do nothing
+		return
+	}
+
+	if apiTokenContent.token == "" {
+		apiTokenContent.once.Do(func() {
+			data, err := ioutil.ReadFile(APITokenFile)
+			if err != nil {
+				panic(fmt.Errorf("failed to read api token file: %w", err))
+			}
+			apiTokenContent.token = strings.TrimSpace(string(data))
+		})
+	}
+
+	r.Header.Add(buckydAuthHeader, apiTokenContent.token)
 }

@@ -1,18 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
-)
 
-import . "github.com/go-graphite/buckytools"
-import "github.com/go-graphite/buckytools/metrics"
-import "github.com/go-graphite/buckytools/hashing"
+	. "github.com/go-graphite/buckytools"
+	"github.com/go-graphite/buckytools/hashing"
+	"github.com/go-graphite/buckytools/metrics"
+)
 
 var metricsCache *metrics.MetricsCacheType
 var tmpDir string
@@ -21,6 +23,8 @@ var hashring *hashing.JSONRingType
 // sparseFiles defines if we create and manage sparse files.
 var sparseFiles bool
 var compressed bool
+var authJWTSecretKey []byte
+var authJWTRootAPIToken string
 
 func usage() {
 	t := []string{
@@ -72,6 +76,8 @@ func main() {
 		hostname = "UNKNOWN"
 	}
 
+	var authJWTSecretFile string
+
 	flag.Usage = usage
 	flag.StringVar(&tmpDir, "tmpdir", os.TempDir(),
 		"Temporary file location.")
@@ -93,6 +99,8 @@ func main() {
 		"Number of copies of each metric in the cluster.")
 	flag.BoolVar(&compressed, "compressed", false,
 		"Create new whisper file in compressed format.")
+	flag.StringVar(&authJWTSecretFile, "auth-jwt-secret-file", "",
+		"API auth JWT private secret file.")
 	flag.Parse()
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)
@@ -101,6 +109,18 @@ func main() {
 			SupportedHashTypes)
 	}
 	hashring = parseRing(hostname, hashType, replicas)
+
+	if authJWTSecretFile != "" {
+		secret, err := ioutil.ReadFile(authJWTSecretFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		authJWTSecretKey = bytes.TrimSpace(secret)
+		authJWTRootAPIToken, err = generateRootAPITokenForInterBuckydAPICalls()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	http.HandleFunc("/", http.NotFound)
 	http.HandleFunc("/metrics", listMetrics)

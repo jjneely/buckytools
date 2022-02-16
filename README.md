@@ -123,6 +123,44 @@ The hashring members can be specified in the following formats:
 
 This exposes a REST API that is documented in REST_API_NOTES.md.
 
+For accessl control, you can enable an [JWT](https://jwt.io/) API token validation
+with flag `-auth-jwt-secret-file /path/to/jwt/secret/file`.
+
+For bucky tools to interact with buckyd with API token as access control, an API
+token produced by the jwt secret is required, by using tools like [jwt-cli](https://github.com/mike-engel/jwt-cli)
+or a simple go program (check cmd/buckyd/metrics_test.go for reference).
+
+Parameters that we can specify in the JWT token:
+
+```json
+{
+	"namespaces": ["sys.*", "app.api.*"],
+	"ops": ["read", "update", "replace", "delete"]
+}
+```
+
+Namespaces could be a valid Graphite globbing query, or just a dot separated prefix/namespace like `"sys.*"`.
+
+Operations could be a compbination of the four values: `"read", "update", "replace", "delete"`.
+
+For root level access, the paramters could be specified as, this is an token scope
+should be used by bucky tools to rebalance clusters:
+
+```json
+{
+	"namespaces": ["*"],
+	"ops": ["*"]
+}
+```
+
+An example of using [jwt-cli](https://github.com/mike-engel/jwt-cli) to produce a valid buckyd API token:
+
+```shell
+jwt encode --secret="xxx" '{"namespaces": ["*"], "ops": ["*"]}'
+```
+
+__NOTE: The payload needs to be valid JSON.__
+
 Client Usage
 ============
 
@@ -183,6 +221,10 @@ Find inconsistent metrics or metrics that are in the wrong place in the
 cluster according to the hashring:
 
     $ bucky inconsistent
+
+Specify API token:
+
+    $ bucky list -h graphite010-g5:4242 -api-token-file /path/to/api.token
 
 Building from Source
 ====================
