@@ -1,6 +1,9 @@
 # github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb
 ## explicit
 github.com/go-graphite/go-whisper
+# github.com/golang-jwt/jwt v3.2.2+incompatible
+## explicit
+github.com/golang-jwt/jwt
 # github.com/golang/snappy v0.0.0-20170215233205-553a64147049
 ## explicit
 github.com/golang/snappy

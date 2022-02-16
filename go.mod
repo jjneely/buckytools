@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049
 	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de
