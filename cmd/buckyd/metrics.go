@@ -23,10 +23,18 @@ import (
 	"github.com/golang/snappy"
 )
 
+const buckydAuthHeader = "X-Buckyd-Authorization"
+
 // listMetrics retrieves a list of metrics on the localhost and sends
 // it to the client.
 func listMetrics(w http.ResponseWriter, r *http.Request) {
 	logRequest(r)
+
+	if err := isTokenValid("*", r.Header.Get(buckydAuthHeader), ACLReadMetrics); err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
 	// Check our methods.  We handle GET/POST.
 	if r.Method != "GET" && r.Method != "POST" {
 		http.Error(w, "Bad request method.", http.StatusBadRequest)
@@ -100,6 +108,11 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "HEAD":
+		if err := isTokenValid(metric, r.Header.Get(buckydAuthHeader), ACLReadMetrics); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
 		stat, err := statMetric(metric, path)
 		w.Header().Set("Content-Length", "0")
 		status := http.StatusOK
@@ -116,19 +129,39 @@ func serveMetrics(w http.ResponseWriter, r *http.Request) {
 		// HEAD seems to behave a bit differently, forcing the headers
 		// seems to get the connection closed after the request.
 	case "GET":
+		if err := isTokenValid(metric, r.Header.Get(buckydAuthHeader), ACLReadMetrics); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
 		serveMetric(w, r, path, metric)
 	case "DELETE":
-		// XXX: Auth?  Holodeck safeties are off!
+		if err := isTokenValid(metric, r.Header.Get(buckydAuthHeader), ACLDeleteMetrics); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
 		deleteMetric(w, path, true)
 	case "PUT":
 		// Replace metric data on disk
 		// XXX: Metric will still be deleted if an error in heal occurs
+
+		if err := isTokenValid(metric, r.Header.Get(buckydAuthHeader), ACLReplaceMetrics); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
 		err := deleteMetric(w, path, false)
 		if err == nil {
 			healMetric(w, r, path)
 		}
 	case "POST":
 		// Backfill
+		if err := isTokenValid(metric, r.Header.Get(buckydAuthHeader), ACLUpdateMetrics); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
 		healMetric(w, r, path)
 	default:
 		http.Error(w, "Bad method request.", http.StatusBadRequest)
@@ -454,6 +487,7 @@ func getMetricData(noEncoding bool, server, name string) (*MetricData, error) {
 	if !noEncoding {
 		r.Header.Set("accept-encoding", "snappy")
 	}
+	injectAuthHeaderIfEnabled(r)
 
 	resp, err := httpClient.Do(r)
 	if err != nil {
@@ -549,4 +583,13 @@ func serveMetric(w http.ResponseWriter, r *http.Request, path, metric string) {
 		return
 	}
 	http.ServeContent(w, r, path, time.Unix(stat.ModTime, 0), content)
+}
+
+func injectAuthHeaderIfEnabled(r *http.Request) {
+	if authJWTRootAPIToken == "" {
+		// API token not enabled, do nothing
+		return
+	}
+
+	r.Header.Add(buckydAuthHeader, authJWTRootAPIToken)
 }

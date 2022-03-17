@@ -141,6 +141,9 @@ func HTTPFetch(u url.URL, body *string) (*http.Response, error) {
 		if method == "POST" {
 			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		}
+
+		injectAuthHeaderIfEnabled(r)
+
 		resp, err := httpClient.Do(r)
 		if err != nil {
 			log.Printf("Error communicating with server: %s", u.Host)
@@ -148,7 +151,12 @@ func HTTPFetch(u url.URL, body *string) (*http.Response, error) {
 			return nil, err
 		}
 
-		if resp.StatusCode != 202 {
+		if resp.StatusCode == http.StatusForbidden {
+			body, _ := ioutil.ReadAll(resp.Body)
+			log.Printf("Error communicating with server: %s", u.Host)
+			log.Printf("%s", body)
+			return nil, fmt.Errorf("auth failed: %s", body)
+		} else if resp.StatusCode != 202 {
 			// Hey, we're done
 			return resp, nil
 		}
@@ -183,7 +191,7 @@ func multiplexListRequests(r []metricListRequest) (map[string][]string, error) {
 				// Errors reported by getMetricsCache
 				comms <- metrics
 			} else {
-				log.Printf("Failed to retrieve metric list from %s: %s", req.url, err)
+				log.Printf("Failed to retrieve metric list from %s: %s", req.url.String(), err)
 				errors = true
 			}
 			wg.Done()
