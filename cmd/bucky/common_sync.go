@@ -317,7 +317,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 			var mhstats *metricHealStats
 			if ms.flags.offloadFetch {
 				var err error
-				mhstats, err = CopyMetric(src, dst, job.oldName)
+				mhstats, err = CopyMetric(src, dst, job.oldName, job.newName)
 				if err != nil {
 					// errors already loggged in the func
 					if errors.Is(err, errNotFound) {

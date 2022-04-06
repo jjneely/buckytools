@@ -47,6 +47,12 @@ func GetClusterConfig(masterHostport string) (*ClusterConfig, error) {
 		return Cluster, nil
 	}
 
+	var err error
+	Cluster, err = newCluster(masterHostport)
+	return Cluster, err
+}
+
+func newCluster(masterHostport string) (*ClusterConfig, error) {
 	master, err := GetSingleHashRing(masterHostport)
 	if err != nil {
 		log.Printf("Abort: Cannot communicate with initial buckyd daemon.")
@@ -59,33 +65,33 @@ func GetClusterConfig(masterHostport string) (*ClusterConfig, error) {
 		return nil, err
 	}
 
-	Cluster = new(ClusterConfig)
-	Cluster.Port = port
-	Cluster.Servers = make([]string, 0)
+	cluster := new(ClusterConfig)
+	cluster.Port = port
+	cluster.Servers = make([]string, 0)
 	switch master.Algo {
 	case "carbon":
-		Cluster.Hash = hashing.NewCarbonHashRing()
+		cluster.Hash = hashing.NewCarbonHashRing()
 	case "fnv1a":
-		Cluster.Hash = hashing.NewFNV1aHashRing()
+		cluster.Hash = hashing.NewFNV1aHashRing()
 	case "jump_fnv1a":
-		Cluster.Hash = hashing.NewJumpHashRing(master.Replicas)
+		cluster.Hash = hashing.NewJumpHashRing(master.Replicas)
 	default:
 		log.Printf("Unknown consistent hash algorithm: %s", master.Algo)
 		return nil, fmt.Errorf("Unknown consistent hash algorithm: %s", master.Algo)
 	}
 
 	for _, v := range master.Nodes {
-		Cluster.Hash.AddNode(v)
-		Cluster.Servers = append(Cluster.Servers, v.Server)
+		cluster.Hash.AddNode(v)
+		cluster.Servers = append(cluster.Servers, v.Server)
 	}
 
 	members := make([]*hashing.JSONRingType, 0)
-	for _, srv := range Cluster.Servers {
+	for _, srv := range cluster.Servers {
 		if srv == master.Name {
 			// Don't query the initial daemon again
 			continue
 		}
-		host := fmt.Sprintf("%s:%s", srv, Cluster.Port)
+		host := fmt.Sprintf("%s:%s", srv, cluster.Port)
 		member, err := GetSingleHashRing(host)
 		if err != nil {
 			log.Printf("Cluster unhealthy: %s: %s", host, err)
@@ -93,8 +99,8 @@ func GetClusterConfig(masterHostport string) (*ClusterConfig, error) {
 		members = append(members, member)
 	}
 
-	Cluster.Healthy = isHealthy(master, members)
-	return Cluster, nil
+	cluster.Healthy = isHealthy(master, members)
+	return cluster, nil
 }
 
 // isHealthy will return true if the cluster ring data represents
