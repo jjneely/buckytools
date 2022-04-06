@@ -1,5 +1,9 @@
 github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb h1:XkDrq9Z5YFcFfWUgLNJgO5Olx6csDoyJnWpn6O5Sq3k=
 github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb/go.mod h1:XnU8q9X8C3OhD8R7gAlRLI6VXU2KMwqgTO9Tshub2qE=
+github.com/go-graphite/go-whisper v0.0.0-20220330121625-421cec45686f h1:r80+Q8OR4NWBclYWOpcKc63KPLtJ6BCp6suQ0e8W0+s=
+github.com/go-graphite/go-whisper v0.0.0-20220330121625-421cec45686f/go.mod h1:XnU8q9X8C3OhD8R7gAlRLI6VXU2KMwqgTO9Tshub2qE=
+github.com/go-graphite/go-whisper v0.0.0-20220406100812-1e1f97814b0e h1:K4+BImuvty4BWOXnVAoU0t6y/yBUHaj6NASmSvhM0O0=
+github.com/go-graphite/go-whisper v0.0.0-20220406100812-1e1f97814b0e/go.mod h1:XnU8q9X8C3OhD8R7gAlRLI6VXU2KMwqgTO9Tshub2qE=
 github.com/golang-jwt/jwt v3.2.2+incompatible h1:IfV12K8xAKAnZqdXVzCZ+TOjboZ2keLg81eXfW3O+oY=
 github.com/golang-jwt/jwt v3.2.2+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
 github.com/golang/snappy v0.0.0-20170215233205-553a64147049 h1:K9KHZbXKpGydfDN0aZrsoHpLJlZsBrGMFWbgLDGnPZk=
