@@ -25,6 +25,7 @@ var sparseFiles bool
 var compressed bool
 var authJWTSecretKey []byte
 var authJWTRootAPIToken string
+var obeyRemoteMtime bool
 
 func usage() {
 	t := []string{
@@ -101,6 +102,8 @@ func main() {
 		"Create new whisper file in compressed format.")
 	flag.StringVar(&authJWTSecretFile, "auth-jwt-secret-file", "",
 		"API auth JWT private secret file.")
+	flag.BoolVar(&obeyRemoteMtime, "mtime", false,
+		"Use modify time from metric as mtime of local file (default false)")
 	flag.Parse()
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)
