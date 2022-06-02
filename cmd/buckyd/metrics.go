@@ -454,6 +454,16 @@ func healMetric(w http.ResponseWriter, r *http.Request, path string) {
 			defer os.Remove(dst.Name()) // not concerned with errors here
 			return
 		}
+		if obeyRemoteMtime {
+			// Set both access time and modified time of the file to the metric ModTime
+			// we should preserve atime but in most of time that's doesn't matter or it's even ignored
+			mtime := time.Unix(stat.ModTime, 0)
+			err := os.Chtimes(path, mtime, mtime)
+			if err != nil {
+				log.Printf("Error chtimes on whisper file %s: %s", path, err)
+				httpError(w, "Error writing whisper data", http.StatusInternalServerError)
+			}
+		}
 		stats.Copy = time.Since(copyStart)
 	}
 }
