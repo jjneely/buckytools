@@ -317,7 +317,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 			var mhstats *metricHealStats
 			if ms.flags.offloadFetch {
 				var err error
-				mhstats, err = CopyMetric(src, dst, job.oldName)
+				mhstats, err = CopyMetric(src, dst, job.oldName, job.newName)
 				if err != nil {
 					// errors already loggged in the func
 					if errors.Is(err, errNotFound) {
@@ -486,6 +486,13 @@ func (ms *metricSyncer) newGoCarbonState(addr string, speedUpInterval int) *goCa
 		fastReset:        make(chan struct{}, 1),
 	}
 
+	max := func(v1, v2 int64) int64 {
+		if v1 > v2 {
+			return v1
+		}
+		return v2
+	}
+
 	go func() {
 		speedUp := time.NewTicker(time.Second * time.Duration(speedUpInterval))
 		speed := time.NewTicker(time.Second / 1)
@@ -498,9 +505,9 @@ func (ms *metricSyncer) newGoCarbonState(addr string, speedUpInterval int) *goCa
 				if ms.isGoCarbonOverload(state) { // overload check
 					atomic.StoreInt64(&state.metricsPerSecond, mps)
 				} else if !ms.flags.noRandomEasing &&
-					atomic.LoadInt64(&state.metricsPerSecond) >= 30 &&
-					rand.Intn(10) <= 2 { // random easing
-					atomic.StoreInt64(&state.metricsPerSecond, rand.Int63n(atomic.LoadInt64(&state.metricsPerSecond))+1)
+					atomic.LoadInt64(&state.metricsPerSecond) >= mps*3 &&
+					rand.Intn(10) <= 3 { // random easing
+					atomic.StoreInt64(&state.metricsPerSecond, max(mps, rand.Int63n(atomic.LoadInt64(&state.metricsPerSecond))+1))
 				} else { // randomly increased sync rate by 1-5 metrics per second
 					atomic.AddInt64(&state.metricsPerSecond, rand.Int63n(5)+1)
 				}

@@ -376,12 +376,12 @@ type metricHealStats struct {
 	Copy     int64
 }
 
-func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
+func CopyMetric(src, dst, srcMetric, dstMetric string) (*metricHealStats, error) {
 	var err error
 	httpClient := GetHTTP()
 	u := &url.URL{
 		Scheme:   "http",
-		Path:     "/metrics/" + metric,
+		Path:     "/metrics/" + dstMetric,
 		RawQuery: "fetch_offload=true",
 	}
 	u.Host, err = SanitizeHostPort(dst)
@@ -393,7 +393,7 @@ func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
 	r, err := http.NewRequest("POST", u.String(), strings.NewReader(url.Values{
 		"no_encoding": {fmt.Sprintf("%t", NoEncoding)},
 		"server":      {src},
-		"metric":      {metric},
+		"metric":      {srcMetric},
 	}.Encode()))
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func CopyMetric(src, dst, metric string) (*metricHealStats, error) {
 			log.Printf("Error on reading response body: %s", err)
 		}
 		msg := fmt.Sprintf("Error reported by server: %s for metric %s: %s",
-			resp.Status, metric, body)
+			resp.Status, dstMetric, body)
 		log.Printf("%s", msg)
 
 		// Given that metrics could be periodically removed from storage backend,

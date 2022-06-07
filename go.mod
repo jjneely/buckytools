@@ -3,7 +3,7 @@ module github.com/go-graphite/buckytools
 go 1.16
 
 require (
-	github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb
+	github.com/go-graphite/go-whisper v0.0.0-20220406100812-1e1f97814b0e
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049
 	github.com/google/go-cmp v0.5.5 // indirect
