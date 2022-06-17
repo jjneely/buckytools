@@ -112,6 +112,8 @@ type metricSyncer struct {
 
 type syncPerNodeStat struct {
 	finishedJobs int64
+	copyError    int64
+	deleteError  int64
 }
 
 func newMetricSyncer(flags *metricSyncerFlags) *metricSyncer {
@@ -324,6 +326,9 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 						atomic.AddInt64(&ms.stat.notFound, 1)
 					} else {
 						atomic.AddInt64(&ms.stat.copyError, 1)
+						// for offload fetch it's ambiguous - let's count error for both src and dst
+						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
+						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
 					}
 
 					return
@@ -336,6 +341,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 						atomic.AddInt64(&ms.stat.notFound, 1)
 					} else {
 						atomic.AddInt64(&ms.stat.copyError, 1)
+						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
 					}
 
 					return
@@ -348,6 +354,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 						atomic.AddInt64(&ms.stat.notFound, 1)
 					} else {
 						atomic.AddInt64(&ms.stat.copyError, 1)
+						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
 					}
 
 					return
@@ -385,6 +392,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 				if err != nil {
 					// errors already loggged in the func
 					atomic.AddInt64(&ms.stat.deleteError, 1)
+					atomic.AddInt64(&ms.stat.nodes[src].deleteError, 1)
 				}
 
 				atomic.AddInt64(&ms.stat.time.delete.count, 1)
@@ -647,6 +655,8 @@ func (ms *metricSyncer) reportToGraphite(interval time.Duration, progressDone ch
 			}
 
 			fmt.Fprintf(conn, "%s.node.%s.finished_jobs.last %d %d\n", ms.flags.graphiteMetricsPrefix, nodeName, stat.finishedJobs, ts)
+			fmt.Fprintf(conn, "%s.node.%s.copy_error.last %d %d\n", ms.flags.graphiteMetricsPrefix, nodeName, stat.copyError, ts)
+			fmt.Fprintf(conn, "%s.node.%s.delete_error.last %d %d\n", ms.flags.graphiteMetricsPrefix, nodeName, stat.deleteError, ts)
 
 			if ms.flags.goCarbonHealthCheck {
 				state := ms.goCarbonStates[node]
