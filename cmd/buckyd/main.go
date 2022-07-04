@@ -31,18 +31,19 @@ func usage() {
 	t := []string{
 		"%s [options] <graphite-node1> <graphite-node2> ...\n",
 		"Version: %s\n\n",
+		"Usage help: %s --help\n\n",
 		"\tA daemon that provides a REST API for remotely uploading,\n",
 		"\tdownloading, deleting, backfilling and getting metadata\n",
 		"\tfor the Graphite Whisper DBs in the local machine's data\n",
 		"\tstore.  The non-optional arguments are the members of your\n",
-		"\tconsistent hashring as found in your carbon-relay configuration\n.",
+		"\tconsistent hashring as found in your carbon-relay configuration.\n",
 		"\tAll of the daemons in your cluster need to be able to build\n",
 		"\tthe same hashring.  You may specify nodes in the following\n",
 		"\tformat: HOST[:PORT][=INSTANCE]\n\n",
 	}
 
-	fmt.Printf(strings.Join(t, ""), os.Args[0], Version)
-	flag.PrintDefaults()
+	fmt.Printf(strings.Join(t, ""), os.Args[0], Version, os.Args[0])
+	//flag.PrintDefaults()
 }
 
 // parseRing builds a representation of the hashring from the command
@@ -72,6 +73,7 @@ func main() {
 	var replicas int
 	var hashType string
 	var bindAddress string
+	var help bool
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "UNKNOWN"
@@ -104,7 +106,15 @@ func main() {
 		"API auth JWT private secret file.")
 	flag.BoolVar(&obeyRemoteMtime, "mtime", false,
 		"Use modify time from metric as mtime of local file (default false)")
+	flag.BoolVar(&help, "help", false,
+		"Usage help")
 	flag.Parse()
+
+	if help {
+		usage()
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
 
 	i := sort.SearchStrings(SupportedHashTypes, hashType)
 	if i == len(SupportedHashTypes) || SupportedHashTypes[i] != hashType {
