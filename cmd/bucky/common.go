@@ -220,7 +220,16 @@ func GetMetricData(server, name string) (*MetricData, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(resp.Body)
+		// Given that metrics could be periodically removed from storage backend,
+		// A 404 could be hanled differently.
+		if resp.StatusCode == 404 {
+			return nil, errNotFound
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Error on reading response body from host %s: %s", resp.Request.Host, err)
+		}
 		log.Printf("Error: Fetching [%s]:%s returned status code: %d  Body: %s",
 			server, name, resp.StatusCode, string(body))
 		return nil, fmt.Errorf("Fetching metric returned status code: %s", resp.Status)
@@ -351,8 +360,12 @@ func PostMetric(server string, metric *MetricData) (*metricHealStats, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		msg := fmt.Sprintf("Error reported by server: %s for metric %s",
-			resp.Status, metric.Name)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Error on reading response body from host %s: %s", resp.Request.Host, err)
+		}
+		msg := fmt.Sprintf("Error: Updating [%s]:%s returned status code: %d  Body: %s",
+			resp.Request.Host, metric.Name, resp.StatusCode, string(body))
 		log.Printf("%s", msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
@@ -410,19 +423,20 @@ func CopyMetric(src, dst, srcMetric, dstMetric string) (*metricHealStats, error)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("Error on reading response body: %s", err)
-		}
-		msg := fmt.Sprintf("Error reported by server: %s for metric %s: %s",
-			resp.Status, dstMetric, body)
-		log.Printf("%s", msg)
-
 		// Given that metrics could be periodically removed from storage backend,
 		// A 404 could be hanled differently.
 		if resp.StatusCode == 404 {
 			return nil, errNotFound
 		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Error on reading response body from host %s: %s", resp.Request.Host, err)
+		}
+
+		msg := fmt.Sprintf("Error: Copying [%s]->[%s]:%s returned status code: %d  Body: %s",
+			src, dst, dstMetric, resp.StatusCode, string(body))
+		log.Printf("%s", msg)
 
 		return nil, fmt.Errorf("%s", msg)
 	}
