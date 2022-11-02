@@ -321,12 +321,18 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 				var err error
 				mhstats, err = CopyMetric(src, dst, job.oldName, job.newName)
 				if err != nil {
-					// errors already loggged in the func
+					// errors already logged in the func
 					if errors.Is(err, errNotFound) {
 						atomic.AddInt64(&ms.stat.notFound, 1)
-					} else {
+					} else if errors.Is(err, errCantReadMetric) {
 						atomic.AddInt64(&ms.stat.copyError, 1)
-						// for offload fetch it's ambiguous - let's count error for both src and dst
+						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
+					} else if errors.Is(err, errCantWriteMetric) {
+						atomic.AddInt64(&ms.stat.copyError, 1)
+						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
+					} else {
+						// it's ambiguous - let's count error for both src and dst
+						atomic.AddInt64(&ms.stat.copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
 					}

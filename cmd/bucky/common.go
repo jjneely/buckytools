@@ -380,6 +380,8 @@ func PostMetric(server string, metric *MetricData) (*metricHealStats, error) {
 }
 
 var errNotFound = errors.New("metric not found")
+var errCantReadMetric = errors.New("can't read metric")
+var errCantWriteMetric = errors.New("can't write metric")
 
 type metricHealStats struct {
 	Download int64
@@ -438,6 +440,12 @@ func CopyMetric(src, dst, srcMetric, dstMetric string) (*metricHealStats, error)
 			src, dst, dstMetric, resp.StatusCode, string(body))
 		log.Printf("%s", msg)
 
+		if resp.StatusCode == http.StatusBadRequest {
+			return nil, errCantReadMetric
+		}
+		if resp.StatusCode == http.StatusInternalServerError {
+			return nil, errCantWriteMetric
+		}
 		return nil, fmt.Errorf("%s", msg)
 	}
 
