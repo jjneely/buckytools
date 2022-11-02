@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
-	"net/http"
 	"os"
-)
 
-import "github.com/golang/snappy"
+	"github.com/golang/snappy"
+)
 
 // copySparse copies a file like interface src to the file dst.  Any 4KiB
 // chunk of null bytes in the src will become a sparse hole in the dst file.
@@ -87,11 +85,6 @@ func copySnappy(src io.Reader) (dst *bytes.Buffer, err error) {
 	}
 	writer.Close()
 	return dst, err
-}
-
-// logRequest logs an incoming HTTP request.
-func logRequest(r *http.Request) {
-	log.Printf("%s - - %s %s", r.RemoteAddr, r.Method, r.RequestURI)
 }
 
 // unmarshalList is a common function for unmarshalling an incoming JSON

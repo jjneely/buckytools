@@ -14,6 +14,7 @@ import (
 	. "github.com/go-graphite/buckytools"
 	"github.com/go-graphite/buckytools/hashing"
 	"github.com/go-graphite/buckytools/metrics"
+	"github.com/gorilla/handlers"
 )
 
 var metricsCache *metrics.MetricsCacheType
@@ -141,7 +142,7 @@ func main() {
 	http.HandleFunc("/hashring", listHashring)
 
 	log.Printf("Starting server on %s", bindAddress)
-	err = http.ListenAndServe(bindAddress, nil)
+	err = http.ListenAndServe(bindAddress, handlers.LoggingHandler(os.Stdout, http.DefaultServeMux))
 	if err != nil {
 		log.Fatal(err)
 	}
