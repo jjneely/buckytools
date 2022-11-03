@@ -28,7 +28,6 @@ const buckydAuthHeader = "X-Buckyd-Authorization"
 // listMetrics retrieves a list of metrics on the localhost and sends
 // it to the client.
 func listMetrics(w http.ResponseWriter, r *http.Request) {
-	logRequest(r)
 
 	if err := isTokenValid("*", r.Header.Get(buckydAuthHeader), ACLReadMetrics); err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
@@ -97,7 +96,6 @@ func listMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveMetrics(w http.ResponseWriter, r *http.Request) {
-	logRequest(r)
 
 	metric := r.URL.Path[len("/metrics/"):]
 	path := MetricToPath(metric)

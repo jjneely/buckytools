@@ -1,7 +1,5 @@
-github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb h1:XkDrq9Z5YFcFfWUgLNJgO5Olx6csDoyJnWpn6O5Sq3k=
-github.com/go-graphite/go-whisper v0.0.0-20191220103904-f154aca40cdb/go.mod h1:XnU8q9X8C3OhD8R7gAlRLI6VXU2KMwqgTO9Tshub2qE=
-github.com/go-graphite/go-whisper v0.0.0-20220330121625-421cec45686f h1:r80+Q8OR4NWBclYWOpcKc63KPLtJ6BCp6suQ0e8W0+s=
-github.com/go-graphite/go-whisper v0.0.0-20220330121625-421cec45686f/go.mod h1:XnU8q9X8C3OhD8R7gAlRLI6VXU2KMwqgTO9Tshub2qE=
+github.com/felixge/httpsnoop v1.0.1 h1:lvB5Jl89CsZtGIWuTcDM1E/vkVs49/Ml7JJe07l8SPQ=
+github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/go-graphite/go-whisper v0.0.0-20220406100812-1e1f97814b0e h1:K4+BImuvty4BWOXnVAoU0t6y/yBUHaj6NASmSvhM0O0=
 github.com/go-graphite/go-whisper v0.0.0-20220406100812-1e1f97814b0e/go.mod h1:XnU8q9X8C3OhD8R7gAlRLI6VXU2KMwqgTO9Tshub2qE=
 github.com/golang-jwt/jwt v3.2.2+incompatible h1:IfV12K8xAKAnZqdXVzCZ+TOjboZ2keLg81eXfW3O+oY=
@@ -10,6 +8,8 @@ github.com/golang/snappy v0.0.0-20170215233205-553a64147049 h1:K9KHZbXKpGydfDN0a
 github.com/golang/snappy v0.0.0-20170215233205-553a64147049/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/gorilla/handlers v1.5.1 h1:9lRY6j8DEeeBT10CvO9hGW0gmky0BprnvDI5vfhUHH4=
+github.com/gorilla/handlers v1.5.1/go.mod h1:t8XrUpc4KVXb7HGyJ4/cEnwQiaxrX/hz1Zv/4g96P1Q=
 github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de h1:1PkYBSyecuAnHiXSq5B2xXO0VptdSyBHVNv45MiRNsk=
 github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de/go.mod h1:Fo0gkB8QTO7j5Ha+ObtDMW5GtL5UoY66JUU8ZoLJeLQ=
 github.com/kr/pretty v0.2.1 h1:Fmg33tUaq4/8ym9TJN1x7sLJnHVwhP33CNkpYV/7rwI=

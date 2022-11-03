@@ -1,3 +1,5 @@
+# github.com/felixge/httpsnoop v1.0.1
+github.com/felixge/httpsnoop
 # github.com/go-graphite/go-whisper v0.0.0-20220406100812-1e1f97814b0e
 ## explicit
 github.com/go-graphite/go-whisper
@@ -9,6 +11,9 @@ github.com/golang-jwt/jwt
 github.com/golang/snappy
 # github.com/google/go-cmp v0.5.5
 ## explicit
+# github.com/gorilla/handlers v1.5.1
+## explicit
+github.com/gorilla/handlers
 # github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de
 ## explicit
 github.com/kisielk/og-rek
