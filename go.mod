@@ -8,6 +8,7 @@ require (
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049
 	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/gorilla/handlers v1.5.1
+	github.com/gorilla/mux v1.8.0
 	github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de
 	github.com/kr/pretty v0.2.1 // indirect
 	github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
