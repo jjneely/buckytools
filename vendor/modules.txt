@@ -25,6 +25,14 @@ github.com/kisielk/og-rek
 # github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
 ## explicit
 github.com/pborman/uuid
+# github.com/pyroscope-io/client v0.4.0
+## explicit
+github.com/pyroscope-io/client/internal/alignedticker
+github.com/pyroscope-io/client/internal/flameql
+github.com/pyroscope-io/client/internal/sortedmap
+github.com/pyroscope-io/client/pyroscope
+github.com/pyroscope-io/client/upstream
+github.com/pyroscope-io/client/upstream/remote
 # golang.org/x/crypto v0.0.0-20180306223934-85f98707c97e
 ## explicit
 golang.org/x/crypto/ssh/terminal
