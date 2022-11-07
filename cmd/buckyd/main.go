@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-graphite/buckytools/hashing"
 	"github.com/go-graphite/buckytools/metrics"
 	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 var metricsCache *metrics.MetricsCacheType
@@ -74,6 +76,7 @@ func main() {
 	var replicas int
 	var hashType string
 	var bindAddress string
+	var pprofAddress string
 	var help bool
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -91,6 +94,8 @@ func main() {
 		"IP:PORT to listen for HTTP requests.")
 	flag.StringVar(&bindAddress, "b", "0.0.0.0:4242",
 		"IP:PORT to listen for HTTP requests.")
+	flag.StringVar(&pprofAddress, "pprof", "localhost:6060",
+		"IP:PORT to listen for pprof.")
 	flag.StringVar(&hostname, "node", hostname,
 		"This node's name in the Graphite consistent hash ring.")
 	flag.StringVar(&hostname, "n", hostname,
@@ -136,13 +141,31 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/", http.NotFound)
-	http.HandleFunc("/metrics", listMetrics)
-	http.HandleFunc("/metrics/", serveMetrics)
-	http.HandleFunc("/hashring", listHashring)
+	if pprofAddress != "" {
+		log.Printf("Starting pprof server on %s", pprofAddress)
+		p := mux.NewRouter()
+		p.HandleFunc("/debug/pprof/", pprof.Index)
+		p.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		p.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		p.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		go func() {
+			log.Println(http.ListenAndServe(pprofAddress, handlers.CombinedLoggingHandler(os.Stdout, p)))
+		}()
+	}
 
+	r := mux.NewRouter()
+	r.HandleFunc("/", http.NotFound)
+	r.HandleFunc("/metrics", listMetrics)
+	r.HandleFunc("/metrics/", serveMetrics)
+	r.HandleFunc("/hashring", listHashring)
+	// disabling pprof routing on main port
+	r.HandleFunc("/debug/pprof/", http.NotFound)
+	r.HandleFunc("/debug/pprof/cmdline", http.NotFound)
+	r.HandleFunc("/debug/pprof/profile", http.NotFound)
+	r.HandleFunc("/debug/pprof/symbol", http.NotFound)
+	r.HandleFunc("/debug/pprof/trace", http.NotFound)
 	log.Printf("Starting server on %s", bindAddress)
-	err = http.ListenAndServe(bindAddress, handlers.LoggingHandler(os.Stdout, http.DefaultServeMux))
+	err = http.ListenAndServe(bindAddress, handlers.LoggingHandler(os.Stdout, r))
 	if err != nil {
 		log.Fatal(err)
 	}
