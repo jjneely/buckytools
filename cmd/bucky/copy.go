@@ -51,7 +51,9 @@ func (cc *copyCommand) do(c Command) int {
 		jobs[cc.dst][cc.src] = append(jobs[cc.dst][cc.src], &syncJob{oldName: m, newName: m})
 	}
 
-	cc.run(jobs)
-
+	err = cc.run(jobs)
+	if err != nil {
+		return 1
+	}
 	return 0
 }
