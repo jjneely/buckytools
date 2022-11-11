@@ -108,10 +108,22 @@ func newCluster(masterHostport string) (*ClusterConfig, error) {
 // built the list from.  The ring is a slice of ring objects from each
 // server in the cluster except the initial buckyd daemon.
 func isHealthy(master *hashing.JSONRingType, ring []*hashing.JSONRingType) bool {
+	var masterInRing bool
+	for _, member := range ring {
+		if member.Name == master.Name {
+			masterInRing = true
+			break
+		}
+	}
+
+	if masterInRing {
+		log.Printf("master is part of ring, so master expects %d nodes and we expect ring %d", len(master.Nodes), len(ring))
+	}
+
 	// XXX: Take replicas into account
-	// The initial buckyd daemon isn't in the ring, so we need to add 1
-	// to the length.
-	if len(master.Nodes) != len(ring)+1 {
+	if !masterInRing && len(master.Nodes) != len(ring)+1 ||
+		masterInRing && len(master.Nodes) != len(ring) {
+		log.Printf("wrong number of nodes compared to expectation; cluster is inconsistent")
 		return false
 	}
 
@@ -120,13 +132,16 @@ func isHealthy(master *hashing.JSONRingType, ring []*hashing.JSONRingType) bool 
 		// Order, host:instance pair, must be the same.  You configured
 		// your cluster with a CM tool, right?
 		if master.Algo != v.Algo {
+			log.Printf("member %s: algo %s does not match master algo %s", v.Name, v.Algo, master.Algo)
 			return false
 		}
 		if len(v.Nodes) != len(master.Nodes) {
+			log.Printf("member %s: node count %d does not match master node count %d", v.Name, len(v.Nodes), len(master.Nodes))
 			return false
 		}
-		for i, v := range v.Nodes {
-			if !hashing.NodeCmp(master.Nodes[i], v) {
+		for i, vv := range v.Nodes {
+			if !hashing.NodeCmp(master.Nodes[i], vv) {
+				log.Printf("member %s: node %d %s does not match master node %d %s", v.Name, i, vv.Server, i, master.Nodes[i].Server)
 				return false
 			}
 		}
