@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/go-graphite/buckytools/metrics"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/pyroscope-io/client/pyroscope"
 )
 
 var metricsCache *metrics.MetricsCacheType
@@ -77,6 +79,7 @@ func main() {
 	var hashType string
 	var bindAddress string
 	var pprofAddress string
+	var pyroscopeAddress string
 	var help bool
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -96,6 +99,8 @@ func main() {
 		"IP:PORT to listen for HTTP requests.")
 	flag.StringVar(&pprofAddress, "pprof", "localhost:6060",
 		"IP:PORT to listen for pprof.")
+	flag.StringVar(&pyroscopeAddress, "pyroscope", "",
+		"IP:PORT of Pyroscope server")
 	flag.StringVar(&hostname, "node", hostname,
 		"This node's name in the Graphite consistent hash ring.")
 	flag.StringVar(&hostname, "n", hostname,
@@ -151,6 +156,37 @@ func main() {
 		go func() {
 			log.Println(http.ListenAndServe(pprofAddress, handlers.CombinedLoggingHandler(os.Stdout, p)))
 		}()
+	}
+
+	if pyroscopeAddress != "" {
+		log.Printf("Pushing flamegraphs to pyroscope server on %s", pyroscopeAddress)
+		// These 2 lines are only required if you're using mutex or block profiling
+		// Read the explanation below for how to set these rates:
+		runtime.SetMutexProfileFraction(5)
+		runtime.SetBlockProfileRate(5)
+		pyroscope.Start(pyroscope.Config{
+			ApplicationName: "buckyd",
+			// replace this with the address of pyroscope server
+			ServerAddress: pyroscopeAddress,
+			// you can disable logging by setting this to nil
+			Logger: nil,
+			// optionally, if authentication is enabled, specify the API key:
+			// AuthToken: os.Getenv("PYROSCOPE_AUTH_TOKEN"),
+			ProfileTypes: []pyroscope.ProfileType{
+				// these profile types are enabled by default:
+				pyroscope.ProfileCPU,
+				pyroscope.ProfileAllocObjects,
+				pyroscope.ProfileAllocSpace,
+				pyroscope.ProfileInuseObjects,
+				pyroscope.ProfileInuseSpace,
+				// these profile types are optional:
+				pyroscope.ProfileGoroutines,
+				pyroscope.ProfileMutexCount,
+				pyroscope.ProfileMutexDuration,
+				pyroscope.ProfileBlockCount,
+				pyroscope.ProfileBlockDuration,
+			},
+		})
 	}
 
 	r := mux.NewRouter()
