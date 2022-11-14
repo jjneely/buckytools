@@ -89,7 +89,9 @@ func (bf2 *backfill2Command) do(c Command) int {
 		}
 	}
 
-	bf2.run(jobs)
-
+	err = bf2.run(jobs)
+	if err != nil {
+		return 1
+	}
 	return 0
 }

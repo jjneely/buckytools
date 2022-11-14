@@ -137,9 +137,9 @@ func RebalanceMetrics(extraHostPorts []string) error {
 
 	ms := newMetricSyncer(msFlags)
 
-	ms.run(jobs)
+	err = ms.run(jobs)
 
-	return nil
+	return err
 }
 
 // rebalanceCommand runs this subcommand.

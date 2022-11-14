@@ -48,6 +48,7 @@ type metricSyncerFlags struct {
 	graphiteMetricsPrefix string
 	graphiteIPToHostname  bool
 	graphiteStatInterval  int
+	errorTolerance        int64
 
 	testingHelper struct {
 		workerSleepSeconds int
@@ -79,6 +80,8 @@ func (msf *metricSyncerFlags) registerFlags(fs *flag.FlagSet) {
 	fs.StringVar(&msf.graphiteMetricsPrefix, "graphite-metrics-prefix", "carbon.buckytools", "Internal graphite metric prefix")
 	fs.BoolVar(&msf.graphiteIPToHostname, "graphite-ip-to-hostname", false, "Convert buckyd ip address to hostname in graphite metric prefix.")
 	fs.IntVar(&msf.graphiteStatInterval, "graphite-stat-interval", 60, "How frequent should bucky tool generate graphite metrics (seconds)")
+
+	fs.Int64Var(&msf.errorTolerance, "errortolerance", 0, "How many copy/delete errors during sync not trigger error exit code.")
 
 	fs.IntVar(&msf.testingHelper.workerSleepSeconds, "testing.worker-sleep-seconds", 0, "Testing helper flag: make worker sleep.")
 }
@@ -259,7 +262,7 @@ func (ms *metricSyncer) run(jobsd map[string]map[string][]*syncJob) error {
 	logbreakdownStat("Delete", &ms.stat.time.delete)
 	log.Printf("      Rest: %s (%.2f%%)", time.Duration(ms.restTime()), float64(100*ms.restTime())/float64(atomic.LoadInt64(&ms.stat.time.total)))
 
-	if (!ms.flags.ignore404 && ms.stat.notFound > 0) || ms.stat.copyError > 0 || ms.stat.deleteError > 0 {
+	if (!ms.flags.ignore404 && ms.stat.notFound > 0) || ms.stat.copyError > ms.flags.errorTolerance || ms.stat.deleteError > ms.flags.errorTolerance {
 		log.Println("Errors are present in sync.")
 		return fmt.Errorf("Errors present.")
 	}
