@@ -49,6 +49,7 @@ type metricSyncerFlags struct {
 	graphiteIPToHostname  bool
 	graphiteStatInterval  int
 	errorTolerance        int64
+	metricErrFile         string
 
 	testingHelper struct {
 		workerSleepSeconds int
@@ -81,13 +82,16 @@ func (msf *metricSyncerFlags) registerFlags(fs *flag.FlagSet) {
 	fs.BoolVar(&msf.graphiteIPToHostname, "graphite-ip-to-hostname", false, "Convert buckyd ip address to hostname in graphite metric prefix.")
 	fs.IntVar(&msf.graphiteStatInterval, "graphite-stat-interval", 60, "How frequent should bucky tool generate graphite metrics (seconds)")
 
-	fs.Int64Var(&msf.errorTolerance, "errortolerance", 0, "How many copy/delete errors during sync not trigger error exit code.")
+	fs.Int64Var(&msf.errorTolerance, "error-tolerance", 0, "How many copy/delete errors during sync not trigger error exit code.")
+	fs.StringVar(&msf.metricErrFile, "metric-err-file", "", "Logfile to dump sync errors")
 
 	fs.IntVar(&msf.testingHelper.workerSleepSeconds, "testing.worker-sleep-seconds", 0, "Testing helper flag: make worker sleep.")
 }
 
 type metricSyncer struct {
 	flags *metricSyncerFlags
+
+	metricErrLogger *log.Logger
 
 	stat struct {
 		totalJobs    int64
@@ -123,6 +127,15 @@ func newMetricSyncer(flags *metricSyncerFlags) *metricSyncer {
 	var ms metricSyncer
 
 	ms.flags = flags
+	ms.metricErrLogger = nil
+	if flags.metricErrFile != "" {
+		f, err := os.OpenFile(flags.metricErrFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("Can't open file %s because of %v", flags.metricErrFile, err)
+		}
+		ms.metricErrLogger = log.New(f, "", log.LstdFlags)
+	}
+
 	ms.stat.nodes = map[string]*syncPerNodeStat{}
 
 	return &ms
@@ -281,6 +294,16 @@ func (ms *metricSyncer) countJobs(jobsd map[string]map[string][]*syncJob) int {
 	return c
 }
 
+func (ms *metricSyncer) metriclog(name string, where string, src bool) {
+	if ms.metricErrLogger != nil {
+		what := "dst"
+		if src {
+			what = "src"
+		}
+		ms.metricErrLogger.Printf("%s,%s,%s", what, name, where)
+	}
+}
+
 func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan struct{}, wg *sync.WaitGroup) {
 	for job := range jobc {
 		func() {
@@ -330,14 +353,18 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 					} else if errors.Is(err, errCantReadMetric) {
 						atomic.AddInt64(&ms.stat.copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
+						ms.metriclog(job.oldName, src, true)
 					} else if errors.Is(err, errCantWriteMetric) {
 						atomic.AddInt64(&ms.stat.copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
+						ms.metriclog(job.newName, dst, false)
 					} else {
 						// it's ambiguous - let's count error for both src and dst
 						atomic.AddInt64(&ms.stat.copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
+						ms.metriclog(job.oldName, src, true)
+						ms.metriclog(job.newName, dst, false)
 					}
 
 					return
@@ -351,6 +378,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 					} else {
 						atomic.AddInt64(&ms.stat.copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[src].copyError, 1)
+						ms.metriclog(job.oldName, src, true)
 					}
 
 					return
@@ -364,6 +392,7 @@ func (ms *metricSyncer) sync(jobc chan *syncJob, srcThrottling map[string]chan s
 					} else {
 						atomic.AddInt64(&ms.stat.copyError, 1)
 						atomic.AddInt64(&ms.stat.nodes[dst].copyError, 1)
+						ms.metriclog(job.newName, dst, false)
 					}
 
 					return
