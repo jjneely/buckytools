@@ -17,7 +17,6 @@ import (
 	"github.com/go-graphite/buckytools/hashing"
 	"github.com/go-graphite/buckytools/metrics"
 	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"github.com/pyroscope-io/client/pyroscope"
 )
 
@@ -148,7 +147,7 @@ func main() {
 
 	if pprofAddress != "" {
 		log.Printf("Starting pprof server on %s", pprofAddress)
-		p := mux.NewRouter()
+		p := http.NewServeMux()
 		p.HandleFunc("/debug/pprof/", pprof.Index)
 		p.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		p.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
@@ -189,7 +188,7 @@ func main() {
 		})
 	}
 
-	r := mux.NewRouter()
+	r := http.NewServeMux()
 	r.HandleFunc("/", http.NotFound)
 	r.HandleFunc("/metrics", listMetrics)
 	r.HandleFunc("/metrics/", serveMetrics)
