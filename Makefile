@@ -35,9 +35,9 @@ gentestmetrics:
 #
 # Run test_setup_$os first
 test: clean bucky buckyd
-	go run -mod vendor testing/rebalance.go $(REBALANCE_FLAGS)
 	go run -mod vendor testing/copy.go $(COPY_FLAGS)
-	go run -mod vendor testing/backfill2.go $(BACKFILL2_FLAGS)
+	go run -mod vendor testing/rebalance.go $(REBALANCE_FLAGS)
+	go run -mod vendor testing/backfill2.go $(BACKFILL_FLAGS)
 
 # only works on linux
 test_setup_linux:
@@ -67,8 +67,8 @@ clean_test:
 	rm -rf bucky buckyd
 	rm -rf testdata_rebalance_*
 	rm -rf testdata_copy_*
-	rm -rf testdata_rebalance_health_check_*
 	rm -rf testdata_backfill2_*
+	rm -rf testdata_rebalance_health_check_*
 
 clean:
 	$(RM) $(targets)
