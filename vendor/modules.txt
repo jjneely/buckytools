@@ -14,9 +14,6 @@ github.com/golang/snappy
 # github.com/gorilla/handlers v1.5.1
 ## explicit
 github.com/gorilla/handlers
-# github.com/gorilla/mux v1.8.0
-## explicit
-github.com/gorilla/mux
 # github.com/kisielk/og-rek v0.0.0-20170425174049-dd41cde712de
 ## explicit
 github.com/kisielk/og-rek
