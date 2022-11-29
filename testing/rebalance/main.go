@@ -19,6 +19,8 @@ import (
 	"github.com/go-graphite/go-whisper"
 )
 
+func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }
+
 func main() {
 	// 1. populate metrics
 	// 2. start three buckyd instances
@@ -250,5 +252,3 @@ func main() {
 		log.Printf("metrics are rebalanced properly.")
 	}
 }
-
-func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }

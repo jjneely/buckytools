@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import pickle
 import time
 
-from types import StringType, FloatType, ListType, TupleType
+from types import *
 
 def ts():
     return time.time()
@@ -52,28 +52,28 @@ data = {
 
 if __name__ == "__main__":
     for key in data.keys():
-        with open("%s.pickle" % key, 'w') as fd:
+        with open("%s.pickle" % key, 'wb') as fd:
             pickle.dump(data[key], fd)
-        with open("%s.line" % key, 'w') as fd:
-            if type(data[key]) != ListType and type(data[key]) != TupleType:
+        with open("%s.line" % key, 'w', encoding='utf-8') as fd:
+            if type(data[key]) != list and type(data[key]) != tuple:
                 continue
             for l in data[key]:
                 if len(l) != 2:
                     continue  # invalid pickle format will be dropped
-                if type(l[0]) != StringType:
+                if type(l[0]) != str:
                     continue
-                if type(l[1]) != ListType and type(l[1]) != TupleType:
+                if type(l[1]) != list and type(l[1]) != tuple:
                     continue
                 if len(l[1]) != 2:
                     continue
 
                 # Format floats the way Go will
                 dp = []
-                if type(l[1][0]) == FloatType:
+                if type(l[1][0]) == float:
                     dp.append("%.12f" % l[1][0])
                 else:
                     dp.append(l[1][0])
-                if type(l[1][1]) == FloatType:
+                if type(l[1][1]) == float:
                     dp.append("%.12f" % l[1][1])
                 else:
                     dp.append(l[1][1])
