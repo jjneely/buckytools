@@ -68,13 +68,13 @@ func main() {
 		panic(err)
 	}
 
-	// sudo ip addr add 10.0.1.7 dev lo
-	// sudo ip addr add 10.0.1.8 dev lo
-	// sudo ip addr add 10.0.1.9 dev lo
+	// sudo ip addr add 127.0.1.7 dev lo
+	// sudo ip addr add 127.0.1.8 dev lo
+	// sudo ip addr add 127.0.1.9 dev lo
 	var (
-		server0 = hashing.Node{Server: "10.0.1.7", Port: 4242, Instance: "server0"}
-		server1 = hashing.Node{Server: "10.0.1.8", Port: 4242, Instance: "server1"}
-		server2 = hashing.Node{Server: "10.0.1.9", Port: 4242, Instance: "server2"}
+		server0 = hashing.Node{Server: "127.0.1.7", Port: 4242, Instance: "server0"}
+		server1 = hashing.Node{Server: "127.0.1.8", Port: 4242, Instance: "server1"}
+		server2 = hashing.Node{Server: "127.0.1.9", Port: 4242, Instance: "server2"}
 	)
 
 	if err := os.MkdirAll(filepath.Join(testDir, "server0"), 0755); err != nil {

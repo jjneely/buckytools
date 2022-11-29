@@ -1,6 +1,7 @@
 RM = rm -f
 targets=bucky  bucky-fill  bucky-isempty  bucky-pickle-relay  bucky-sparsify  buckyd  findhash  gentestmetrics
 
+SHELL := /bin/bash
 OS := $(shell uname)
 
 PHONY: all
@@ -50,26 +51,26 @@ e2e_test_rebalance_health_check: clean bucky buckyd
 
 e2e_test_setup:
 ifeq ($(OS),Linux)
-	sudo ip addr add 10.0.1.7 dev lo
-	sudo ip addr add 10.0.1.8 dev lo
-	sudo ip addr add 10.0.1.9 dev lo
+	sudo ip addr add 127.0.1.7 dev lo
+	sudo ip addr add 127.0.1.8 dev lo
+	sudo ip addr add 127.0.1.9 dev lo
 endif
 ifeq ($(OS),Darwin)
-	sudo ifconfig lo0 alias 10.0.1.7 up
-	sudo ifconfig lo0 alias 10.0.1.8 up
-	sudo ifconfig lo0 alias 10.0.1.9 up
+	sudo ifconfig lo0 alias 127.0.1.7 up
+	sudo ifconfig lo0 alias 127.0.1.8 up
+	sudo ifconfig lo0 alias 127.0.1.9 up
 endif
 
 e2e_test_setup_clean:
 ifeq ($(OS),Linux)
-	sudo ip addr del 10.0.1.7/32 dev lo
-	sudo ip addr del 10.0.1.8/32 dev lo
-	sudo ip addr del 10.0.1.9/32 dev lo
+	sudo ip addr del 127.0.1.7/32 dev lo
+	sudo ip addr del 127.0.1.8/32 dev lo
+	sudo ip addr del 127.0.1.9/32 dev lo
 endif
 ifeq ($(OS),Darwin)
-	sudo ifconfig lo0 -alias 10.0.1.7
-	sudo ifconfig lo0 -alias 10.0.1.8
-	sudo ifconfig lo0 -alias 10.0.1.9
+	sudo ifconfig lo0 -alias 127.0.1.7
+	sudo ifconfig lo0 -alias 127.0.1.8
+	sudo ifconfig lo0 -alias 127.0.1.9
 endif
 
 clean_test:
