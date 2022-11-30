@@ -1,0 +1,45 @@
+name: Run tests
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go:
+          - ^1.18
+          - ^1.19
+          - ^1
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 200
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install iproute2 net-tools -y
+
+    - name: Run tests
+      run: |
+        make test
+        make
+
+    - name: Run e2e tests
+      run: |
+        make e2e_test_setup
+        make e2e_test
+        make e2e_test_setup_clean
