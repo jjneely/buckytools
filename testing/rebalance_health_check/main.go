@@ -22,6 +22,8 @@ import (
 	"github.com/go-graphite/go-whisper"
 )
 
+func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }
+
 func main() {
 	// 1. populate metrics
 	// 2. start three buckyd instances
@@ -66,13 +68,13 @@ func main() {
 		panic(err)
 	}
 
-	// sudo ip addr add 10.0.1.7 dev lo
-	// sudo ip addr add 10.0.1.8 dev lo
-	// sudo ip addr add 10.0.1.9 dev lo
+	// sudo ip addr add 127.0.1.7 dev lo
+	// sudo ip addr add 127.0.1.8 dev lo
+	// sudo ip addr add 127.0.1.9 dev lo
 	var (
-		server0 = hashing.Node{Server: "10.0.1.7", Port: 4242, Instance: "server0"}
-		server1 = hashing.Node{Server: "10.0.1.8", Port: 4242, Instance: "server1"}
-		server2 = hashing.Node{Server: "10.0.1.9", Port: 4242, Instance: "server2"}
+		server0 = hashing.Node{Server: "127.0.1.7", Port: 4242, Instance: "server0"}
+		server1 = hashing.Node{Server: "127.0.1.8", Port: 4242, Instance: "server1"}
+		server2 = hashing.Node{Server: "127.0.1.9", Port: 4242, Instance: "server2"}
 	)
 
 	if err := os.MkdirAll(filepath.Join(testDir, "server0"), 0755); err != nil {
@@ -317,5 +319,3 @@ func main() {
 		log.Printf("metrics are rebalanced properly.")
 	}
 }
-
-func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }

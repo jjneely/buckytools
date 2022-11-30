@@ -1,23 +1,21 @@
 package main
 
 import (
-	"crypto/rand"
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	mrand "math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-graphite/buckytools/hashing"
 	"github.com/go-graphite/go-whisper"
 )
+
+func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }
 
 func main() {
 	// 1. populate metrics
@@ -36,7 +34,7 @@ func main() {
 		}
 	}()
 
-	testDir, err := os.MkdirTemp("./", "testdata_copy_*")
+	testDir, err := os.MkdirTemp("./", "testdata_backfill2_*")
 	if err != nil {
 		panic(err)
 	}
@@ -58,15 +56,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	copyLog, err := os.Create(filepath.Join(testDir, "copy.log"))
+	testCommandLog, err := os.Create(filepath.Join(testDir, "backfill2.log"))
 	if err != nil {
 		panic(err)
 	}
 
 	var (
-		server0 = hashing.Node{Server: "10.0.1.7", Port: 4242, Instance: "server0"}
-		server1 = hashing.Node{Server: "10.0.1.8", Port: 4242, Instance: "server1"}
-		server2 = hashing.Node{Server: "10.0.1.9", Port: 4242, Instance: "server2"}
+		server0 = hashing.Node{Server: "127.0.1.7", Port: 4242, Instance: "server0"}
+		server1 = hashing.Node{Server: "127.0.1.8", Port: 4242, Instance: "server1"}
+		server2 = hashing.Node{Server: "127.0.1.9", Port: 4242, Instance: "server2"}
 	)
 
 	if err := os.MkdirAll(filepath.Join(testDir, "server0"), 0755); err != nil {
@@ -108,7 +106,7 @@ func main() {
 	mrand.Seed(time.Now().Unix())
 
 	var wg sync.WaitGroup
-	var totalFiles = 100
+	var totalFiles = 10
 	wg.Add(totalFiles)
 
 	var metrics = map[string]hashing.Node{}
@@ -116,19 +114,15 @@ func main() {
 	var ring = hashing.NewJumpHashRing(3)
 	ring.AddNode(server0)
 	ring.AddNode(server1)
+	ring.AddNode(server2)
 
 	filesStart := time.Now()
 	for i := 0; i < totalFiles; i++ {
-		b := make([]byte, 32)
-		_, err := rand.Read(b)
-		if err != nil {
-			panic(fmt.Errorf("failed to read random bytes: %s", err))
-		}
 		rets, err := whisper.ParseRetentionDefs("1s:3h,10s:3d,1m:31d")
 		if err != nil {
 			panic(err)
 		}
-		metric := fmt.Sprintf("metric_%x", b)
+		metric := fmt.Sprintf("metric_%d", i)
 		node := ring.GetNode(metric)
 		metrics[metric] = node
 		file, err := whisper.Create(filepath.Join(testDir, node.Instance, metric+".wsp"), rets, whisper.Sum, 0)
@@ -151,102 +145,37 @@ func main() {
 	log.Printf("finished creating whisper files. took %s\n", time.Since(filesStart))
 
 	time.Sleep(time.Second * 3)
-	rebalanceStart := time.Now()
-	copyCmd := exec.Command("./bucky", "copy", "-f", "-offload", "-src", nodeStr(server0), "-dst", nodeStr(server2), "-w", "3", "-ignore404")
+	testCommandStart := time.Now()
+	testCommandCmd := exec.Command(
+		"./bucky", "backfill2",
+		"-metric-map-file", "./testing/data/map1.json",
+		"-offload", "-w", "3", "-ignore404", "-delete",
+		"-src-cluster-seed", nodeStr(server0),
+		"-dst-cluster-seed", nodeStr(server1),
+	)
 
-	copyCmd.Stdout = copyLog
-	copyCmd.Stderr = copyLog
+	testCommandCmd.Stdout = testCommandLog
+	testCommandCmd.Stderr = testCommandLog
 
-	log.Printf("copyCmd.String() = %+v\n", copyCmd.String())
-	if err := copyCmd.Run(); err != nil {
-		log.Printf("failed to run rebalance command: %s", err)
+	log.Printf("testCommandCmd.String() = %+v\n", testCommandCmd.String())
+	if err := testCommandCmd.Run(); err != nil {
+		log.Printf("failed to run command: %s", err)
 		failed = true
 		return
 	}
 
-	log.Printf("finished copying. took %s\n", time.Since(rebalanceStart))
+	log.Printf("finished command. took %s\n", time.Since(testCommandStart))
 
-	files0, err := os.ReadDir(filepath.Join(testDir, "server0"))
-	if err != nil {
-		panic(err)
-	}
-	files2, err := os.ReadDir(filepath.Join(testDir, "server2"))
-	if err != nil {
-		panic(err)
-	}
-	if len(files0) != len(files2) {
-		log.Printf("file count doesn't match on server0 (%d) and server2 (%d)", len(files0), len(files2))
-		failed = true
-		return
-	}
-
-	log.Printf("%d files relocated.", len(files0))
-
-	var inconsistentMetrics []string
-	for _, m := range files0 {
-		newf, err := whisper.Open(filepath.Join(testDir, "server2", m.Name()))
-		if err != nil {
-			panic(err)
-		}
-		oldf, err := whisper.Open(filepath.Join(testDir, "server0", m.Name()))
-		if err != nil {
-			panic(err)
-		}
-		nrets := newf.Retentions()
-		orets := oldf.Retentions()
-		if !reflect.DeepEqual(nrets, orets) {
-			log.Printf("rention policy not equal:\n  new: %#v\n  old: %#v\n", nrets, orets)
-		}
-		now := int(time.Now().Unix())
-		for _, ret := range nrets {
-			ndata, err := newf.Fetch(now-ret.MaxRetention(), now)
-			if err != nil {
-				panic(err)
-			}
-			odata, err := oldf.Fetch(now-ret.MaxRetention(), now)
-			if err != nil {
-				panic(err)
-			}
-			if ndata == nil {
-				log.Printf("failed to retrieve data from file %s\n", newf.File().Name())
-				continue
-			}
-			if odata == nil {
-				log.Printf("failed to retrieve data from file %s\n", newf.File().Name())
-				continue
-			}
-
-			var count int
-			var npoints = ndata.Points()
-			var opoints = odata.Points()
-			for i, opoint := range opoints {
-				if !math.IsNaN(opoint.Value) && !math.IsNaN(npoints[i].Value) && opoint != npoints[i] {
-					count++
-					log.Printf("opoints = %+v\n", opoints[i])
-					log.Printf("npoints = %+v\n", npoints[i])
-
-					if len(inconsistentMetrics) == 0 || inconsistentMetrics[len(inconsistentMetrics)-1] != m.Name() {
-						inconsistentMetrics = append(inconsistentMetrics, m.Name())
-					}
-				}
-			}
-
-			if count > 0 {
-				log.Printf("metric %s %s: %d points not equal", m.Name(), ret, count)
-			}
-		}
-
-		newf.Close()
-		oldf.Close()
-	}
-
-	if len(inconsistentMetrics) > 0 {
-		log.Printf("%d copied metrics not matching original metrics: %s", len(inconsistentMetrics), strings.Join(inconsistentMetrics, ","))
+	files0, _ := os.ReadDir(filepath.Join(testDir, "server0"))
+	files1, _ := os.ReadDir(filepath.Join(testDir, "server1"))
+	files2, _ := os.ReadDir(filepath.Join(testDir, "server2"))
+	if len(files0) != 2 || len(files1) != 6 || len(files2) != 2 {
+		log.Printf("failed to backfill command: files are not balanced.")
 		failed = true
 		return
 	} else {
-		log.Printf("metrics are copied properly.")
+		log.Printf("backfill command succeeded.")
+		failed = false
+		return
 	}
 }
-
-func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }

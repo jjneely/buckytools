@@ -19,6 +19,8 @@ import (
 	"github.com/go-graphite/go-whisper"
 )
 
+func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }
+
 func main() {
 	// 1. populate metrics
 	// 2. start three buckyd instances
@@ -36,7 +38,7 @@ func main() {
 		}
 	}()
 
-	testDir, err := os.MkdirTemp("./", "testdata_rebalance_*")
+	testDir, err := os.MkdirTemp("./", "testdata_copy_*")
 	if err != nil {
 		panic(err)
 	}
@@ -58,15 +60,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	rebalanceLog, err := os.Create(filepath.Join(testDir, "rebalance.log"))
+	copyLog, err := os.Create(filepath.Join(testDir, "copy.log"))
 	if err != nil {
 		panic(err)
 	}
 
 	var (
-		server0 = hashing.Node{Server: "10.0.1.7", Port: 4242, Instance: "server0"}
-		server1 = hashing.Node{Server: "10.0.1.8", Port: 4242, Instance: "server1"}
-		server2 = hashing.Node{Server: "10.0.1.9", Port: 4242, Instance: "server2"}
+		server0 = hashing.Node{Server: "127.0.1.7", Port: 4242, Instance: "server0"}
+		server1 = hashing.Node{Server: "127.0.1.8", Port: 4242, Instance: "server1"}
+		server2 = hashing.Node{Server: "127.0.1.9", Port: 4242, Instance: "server2"}
 	)
 
 	if err := os.MkdirAll(filepath.Join(testDir, "server0"), 0755); err != nil {
@@ -152,45 +154,43 @@ func main() {
 
 	time.Sleep(time.Second * 3)
 	rebalanceStart := time.Now()
-	rebalanceCmd := exec.Command(
-		"./bucky", "rebalance", "-f",
-		"-h", nodeStr(server0), "-offload",
-		"-w", "3", "-ignore404",
-		// "-allowed-dsts", "localhost:40002",
-		// "-allowed-dsts", "xxx:xxx",
-	)
+	copyCmd := exec.Command("./bucky", "copy", "-f", "-offload", "-src", nodeStr(server0), "-dst", nodeStr(server2), "-w", "3", "-ignore404")
 
-	rebalanceCmd.Stdout = rebalanceLog
-	rebalanceCmd.Stderr = rebalanceLog
+	copyCmd.Stdout = copyLog
+	copyCmd.Stderr = copyLog
 
-	log.Printf("rebalanceCmd.String() = %+v\n", rebalanceCmd.String())
-	if err := rebalanceCmd.Run(); err != nil {
+	log.Printf("copyCmd.String() = %+v\n", copyCmd.String())
+	if err := copyCmd.Run(); err != nil {
 		log.Printf("failed to run rebalance command: %s", err)
 		failed = true
 		return
 	}
 
-	log.Printf("finished rebalancing. took %s\n", time.Since(rebalanceStart))
+	log.Printf("finished copying. took %s\n", time.Since(rebalanceStart))
 
-	files, err := os.ReadDir(filepath.Join(testDir, "server2"))
+	files0, err := os.ReadDir(filepath.Join(testDir, "server0"))
 	if err != nil {
 		panic(err)
 	}
-	if len(files) == 0 {
-		log.Printf("failed to rebalance cluster: 0 files are relocated.")
+	files2, err := os.ReadDir(filepath.Join(testDir, "server2"))
+	if err != nil {
+		panic(err)
+	}
+	if len(files0) != len(files2) {
+		log.Printf("file count doesn't match on server0 (%d) and server2 (%d)", len(files0), len(files2))
 		failed = true
 		return
 	}
 
-	log.Printf("%d files relocated.", len(files))
+	log.Printf("%d files relocated.", len(files0))
 
 	var inconsistentMetrics []string
-	for _, m := range files {
+	for _, m := range files0 {
 		newf, err := whisper.Open(filepath.Join(testDir, "server2", m.Name()))
 		if err != nil {
 			panic(err)
 		}
-		oldf, err := whisper.Open(filepath.Join(testDir, metrics[strings.TrimSuffix(m.Name(), ".wsp")].Instance, m.Name()))
+		oldf, err := whisper.Open(filepath.Join(testDir, "server0", m.Name()))
 		if err != nil {
 			panic(err)
 		}
@@ -243,12 +243,10 @@ func main() {
 	}
 
 	if len(inconsistentMetrics) > 0 {
-		log.Printf("%d rebalanced metrics not matching original metrics: %s", len(inconsistentMetrics), strings.Join(inconsistentMetrics, ","))
+		log.Printf("%d copied metrics not matching original metrics: %s", len(inconsistentMetrics), strings.Join(inconsistentMetrics, ","))
 		failed = true
 		return
 	} else {
-		log.Printf("metrics are rebalanced properly.")
+		log.Printf("metrics are copied properly.")
 	}
 }
-
-func nodeStr(n hashing.Node) string { return fmt.Sprintf("%s:%d", n.Server, n.Port) }
