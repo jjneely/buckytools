@@ -1,7 +1,13 @@
 package metrics
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/binary"
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -17,6 +23,11 @@ const (
 	EncIdentity = iota
 	EncSnappy
 	EncMax
+	version2MagicString     = "\x7fflc02" // magic string from go carbon
+	flcv2StatFieldSize      = 8
+	flcv2StatFieldCount     = 4
+	flcv2EntrySeparatorSize = 1
+	flcv2EntryStatLen       = flcv2StatFieldSize*flcv2StatFieldCount + flcv2EntrySeparatorSize
 )
 
 // MetricData represents an individual metric and its raw data.
@@ -36,7 +47,10 @@ type MetricsCacheType struct {
 	updating  bool
 }
 
-var Prefix string
+var (
+	CachePath string
+	Prefix    string
+)
 
 // CacheTimeOut is the time in seconds that a metrics cache is considered
 // fresh.  If the update timestamp is less than time.Now() - timeout then
@@ -51,6 +65,8 @@ func init() {
 		"The root of the whisper database store.")
 	flag.StringVar(&Prefix, "p", "/opt/graphite/storage/whisper",
 		"The root of the whisper database store.")
+	flag.StringVar(&CachePath, "cache_path", "/var/lib/carbon/carbonserver-file-list-cache.gzip",
+		"The path to go-carbon Trie Index Tree cache file")
 }
 
 // MetricToPath takes a metric name and return an absolute path
@@ -66,17 +82,6 @@ func MetricToPath(metric string) string {
 func MetricToRelative(metric string) string {
 	p := strings.Replace(metric, ".", "/", -1) + ".wsp"
 	return path.Clean(p)
-}
-
-// MetricsToPaths operates on a slice of metric names and returns a
-// slice of absolute paths using the --prefix flag.
-func MetricsToPaths(metrics []string) []string {
-	p := make([]string, 0)
-	for _, m := range metrics {
-		p = append(p, MetricToPath(m))
-	}
-
-	return p
 }
 
 // PathToMetric takes an absolute path that begins with the --prefix flag
@@ -103,17 +108,6 @@ func RelativeToMetric(p string) string {
 	p = path.Clean(p)
 	p = strings.Replace(p, ".wsp", "", 1)
 	return strings.Replace(p, "/", ".", -1)
-}
-
-// PathsToMetrics operates on a slice of absolute paths prefixed with
-// the --prefix flag and returns a slice of metric names.
-func PathsToMetrics(p []string) []string {
-	ret := make([]string, 0)
-	for _, v := range p {
-		ret = append(ret, PathToMetric(v))
-	}
-
-	return ret
 }
 
 // FilterList returns a slice of strings that contain only the string found
@@ -201,6 +195,80 @@ func (m *MetricsCacheType) TimedOut() bool {
 	return time.Now().Unix()-m.timestamp > CacheTimeOut
 }
 
+type fileListCacheV2 struct {
+	path   string
+	file   *os.File
+	reader *gzip.Reader
+}
+
+func (flc fileListCacheV2) Close() error {
+	var errs []string
+	if err := flc.file.Close(); err != nil {
+		errs = append(errs, fmt.Sprintf("could not close file %s", err))
+	}
+	if err := flc.reader.Close(); err != nil {
+		errs = append(errs, fmt.Sprintf("could not close reader %s", err))
+	}
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, ";"))
+	}
+	return nil
+}
+
+func (flc fileListCacheV2) Read() (string, error) {
+	var plenBuf [8]byte
+	if _, err := io.ReadFull(flc.reader, plenBuf[:]); err != nil {
+		err = fmt.Errorf("flcv2: failed to read path len: %w", err)
+		return "", err
+	}
+	plen := int(binary.BigEndian.Uint64(plenBuf[:]))
+
+	// filepath on linux has a 4k limit, but we are timing it 2 here just to
+	// be flexible and avoid bugs or corruptions to causes panics or oom in
+	// go-carbon
+	//
+	// * https://man7.org/linux/man-pages/man3/realpath.3.html#NOTES
+	// * https://www.ibm.com/docs/en/spectrum-protect/8.1.9?topic=parameters-file-specification-syntax
+	const maxPathLen = 4096 * 2
+	if plen > maxPathLen {
+		err := fmt.Errorf("flcv2: illegal file path length %d (max: %d)", plen, maxPathLen)
+		return "", err
+	}
+
+	data := make([]byte, plen+flcv2EntryStatLen)
+	if _, err := io.ReadFull(flc.reader, data); err != nil {
+		err = fmt.Errorf("flcv2: failed to read full data: %w", err)
+		return "", err
+	}
+	return string(data[:plen]), nil
+}
+
+func NewFileListCache(path string) (*fileListCacheV2, error) {
+	flc := fileListCacheV2{}
+	var err error
+	flc.file, err = os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	flc.reader, err = gzip.NewReader(flc.file)
+	if err != nil {
+		return nil, err
+	}
+	magic := make([]byte, len(version2MagicString))
+
+	switch n, err := flc.reader.Read(magic); {
+	case err != nil:
+		return nil, err
+	case n != len(version2MagicString):
+		return nil, fmt.Errorf("failed to read full v2 magic string (%d): %d", len(version2MagicString), n)
+	case !bytes.Equal(magic, []byte(version2MagicString)):
+		flc.Close()
+		return nil, fmt.Errorf("wrong cache file version")
+	}
+
+	return &flc, nil
+}
+
 // RefreshCache updates the list of metric names in the cache from the local
 // file store.  Blocks until completion.  Does not check cache freshness
 // so use with care.
@@ -221,12 +289,37 @@ func (m *MetricsCacheType) RefreshCache() error {
 	}
 
 	// Create new empty slice
-	log.Printf("Scaning %s for metrics...", Prefix)
-	m.metrics = make([]string, 0)
-	err := filepath.Walk(Prefix, examine)
-	log.Printf("Scan complete.")
-	if err != nil {
-		log.Printf("Scan returned an Error: %s", err)
+	log.Printf("Scanning %s for metrics...", Prefix)
+	readFromCache := false
+	if CachePath != "" {
+		readFromCache = true
+		m.metrics = make([]string, 0)
+		flc, err := NewFileListCache(CachePath)
+		if err != nil {
+			log.Printf("Could not open File Cache: %s", err)
+			readFromCache = false
+		} else {
+			for {
+				metricPath, err := flc.Read()
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						log.Printf("Could not read File Cache: %s", err)
+						readFromCache = false
+					}
+					log.Printf("File cache scan complete.")
+					break
+				}
+				m.metrics = append(m.metrics, PathToMetric(metricPath))
+			}
+		}
+	}
+
+	if !readFromCache {
+		err := filepath.Walk(Prefix, examine)
+		log.Printf("Whisper files scan complete.")
+		if err != nil {
+			log.Printf("Scan returned an Error: %s", err)
+		}
 	}
 
 	m.timestamp = time.Now().Unix()
